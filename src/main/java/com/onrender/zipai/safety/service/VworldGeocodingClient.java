@@ -2,6 +2,7 @@ package com.onrender.zipai.safety.service;
 
 import tools.jackson.databind.JsonNode;
 import java.net.URI;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -197,7 +198,11 @@ public class VworldGeocodingClient implements SafetyCoordinateGeocoder {
     }
 
     private static RestClient defaultRestClient() {
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
+        HttpClient httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(Duration.ofSeconds(3));
         return RestClient.builder().requestFactory(requestFactory).build();
     }
