@@ -230,6 +230,11 @@ body.recommended-category .listing-mode-bar, body.recommended-category .listing-
 .listing-mode-bar button.active { border-color: var(--blue); color: #fff; background: var(--blue); }
 .listing-mode-bar a { display: inline-flex; margin-left: auto; align-items: center; gap: 5px; color: var(--blue); }
 body.house-category .listing-mode-bar .market-mode, body.public-category .listing-mode-bar { display: none; }
+/* Keep the LH heading above its independently scrolling notice list. */
+body.public-category .listing-panel { display: flex; flex-direction: column; overflow: hidden; }
+body.public-category .listing-panel > :not(.property-list) { flex-shrink: 0; }
+body.public-category .listing-panel .listing-heading { position: relative; top: auto; }
+body.public-category .listing-panel .property-list { flex: 1 1 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #c8d0dc transparent; }
 .listing-filter-panel { padding: 14px 16px; border-bottom: 1px solid #e7ebf1; background: #f8faff; }
 .listing-filter-panel[hidden], .market-filters[hidden], .search-summary[hidden] { display: none !important; }
 .listing-filter-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 11px; align-items: end; }
