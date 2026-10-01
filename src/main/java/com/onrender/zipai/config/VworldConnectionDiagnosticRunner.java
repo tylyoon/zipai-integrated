@@ -7,6 +7,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -27,7 +30,48 @@ public class VworldConnectionDiagnosticRunner implements ApplicationRunner {
         log.info("[VWORLD-DIAG] START key-free HTTPS check; PARAM_REQUIRED is an expected response");
         checkJdkClient();
         checkUrlConnection();
+        checkCurl();
         log.info("[VWORLD-DIAG] END; disable ZIPAI_VWORLD_DIAGNOSTICS_ENABLED after collecting these logs");
+    }
+
+    private void checkCurl() {
+        long started = System.nanoTime();
+        Path output = null;
+        Process process = null;
+        try {
+            output = Files.createTempFile("vworld-diag-", ".txt");
+            process = new ProcessBuilder("curl", "--silent", "--show-error",
+                "--http1.1", "--connect-timeout", "5", "--max-time", "10",
+                "--max-filesize", "8192", "--write-out", "\nVWORLD_HTTP_STATUS=%{http_code}",
+                TARGET.toASCIIString())
+                .redirectErrorStream(true).redirectOutput(output.toFile()).start();
+            if (!process.waitFor(12, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                log.warn("[VWORLD-DIAG] transport=CURL_HTTP_1_1 timeout=true elapsedMs={}", elapsed(started));
+                return;
+            }
+            String response = Files.readString(output, StandardCharsets.UTF_8);
+            String status = "000";
+            int marker = response.lastIndexOf("VWORLD_HTTP_STATUS=");
+            if (marker >= 0) {
+                String value = response.substring(marker + "VWORLD_HTTP_STATUS=".length()).trim();
+                if (value.matches("[0-9]{3}")) status = value;
+            }
+            // Curl output stays private; only status and known error categories are logged.
+            log.info("[VWORLD-DIAG] transport=CURL_HTTP_1_1 exitCode={} httpStatus={} expectedMissingKey={} elapsedMs={}",
+                process.exitValue(), status, response.contains("PARAM_REQUIRED"), elapsed(started));
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            failure("CURL_HTTP_1_1", error, started);
+        } catch (Exception error) {
+            failure("CURL_HTTP_1_1", error, started);
+        } finally {
+            if (process != null && process.isAlive()) process.destroyForcibly();
+            if (output != null) {
+                try { Files.deleteIfExists(output); }
+                catch (Exception ignored) { /* Temporary OS file; contains no API key. */ }
+            }
+        }
     }
 
     private void checkJdkClient() {
