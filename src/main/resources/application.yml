@@ -75,6 +75,10 @@ server:
   forward-headers-strategy: framework
 
 zipai:
+  lifestyle:
+    ml:
+      python-command: ${ZIPAI_LIFESTYLE_ML_PYTHON_COMMAND:}
+      script-path: ${ZIPAI_LIFESTYLE_ML_SCRIPT_PATH:rpa/lifestyle_ml/recommendation_service.py}
   finance:
     import-token: ${FINANCE_IMPORT_TOKEN:}
   safety:
