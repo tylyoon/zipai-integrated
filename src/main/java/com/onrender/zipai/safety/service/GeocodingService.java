@@ -25,7 +25,7 @@ public class GeocodingService {
         if (!saved.isEmpty()) {
             return enrichAdministrativeArea(keyword, saved);
         }
-        return List.of(searchVworld(keyword));
+        return List.of(searchExternal(keyword));
     }
 
     private List<SafetyLocation> enrichAdministrativeArea(String query, List<SafetyLocation> saved) {
@@ -39,7 +39,7 @@ public class GeocodingService {
                 )).toList())
                 .orElse(saved);
         } catch (ResponseStatusException error) {
-            // 저장된 중심좌표는 VWorld가 일시적으로 실패해도 안전도 계산에 사용할 수 있다.
+            // 저장된 중심좌표는 주소 검색 API가 일시적으로 실패해도 안전도 계산에 사용할 수 있다.
             return saved;
         }
     }
@@ -52,7 +52,7 @@ public class GeocodingService {
         return locations.get(0);
     }
 
-    private SafetyLocation searchVworld(String query) {
+    private SafetyLocation searchExternal(String query) {
         return coordinateGeocoder.geocode(query)
             .map(coordinate -> new SafetyLocation(
                 null,
@@ -60,7 +60,7 @@ public class GeocodingService {
                 coordinate.address(),
                 coordinate.latitude(),
                 coordinate.longitude(),
-                "국토교통부 VWorld Search API",
+                "네이버 Maps Geocoding API",
                 LocalDate.now(),
                 coordinate.sidoName(),
                 coordinate.sigunguName()

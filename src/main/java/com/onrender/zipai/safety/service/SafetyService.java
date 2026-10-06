@@ -86,7 +86,7 @@ public class SafetyService {
             score.metrics(),
             score.summary(),
             facilities,
-            "공공데이터 적재 DB + VWorld 주소검색",
+            "공공데이터 적재 DB + 네이버 Maps 주소검색",
             dataUpdatedAt
         );
     }
