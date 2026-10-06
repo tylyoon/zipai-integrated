@@ -10,6 +10,8 @@ import java.time.Duration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
+import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -37,12 +39,14 @@ public class VworldConnectionDiagnosticRunner implements ApplicationRunner {
     private void checkCurl() {
         long started = System.nanoTime();
         Path output = null;
+        Path headers = null;
         Process process = null;
         try {
             output = Files.createTempFile("vworld-diag-", ".txt");
+            headers = Files.createTempFile("vworld-headers-", ".txt");
             process = new ProcessBuilder("curl", "--silent", "--show-error",
                 "--http1.1", "--connect-timeout", "5", "--max-time", "10",
-                "--max-filesize", "8192", "--write-out", "\nVWORLD_HTTP_STATUS=%{http_code}",
+                "--max-filesize", "8192", "--dump-header", headers.toString(), "--write-out", "\nVWORLD_HTTP_STATUS=%{http_code}",
                 TARGET.toASCIIString())
                 .redirectErrorStream(true).redirectOutput(output.toFile()).start();
             if (!process.waitFor(12, TimeUnit.SECONDS)) {
@@ -57,9 +61,16 @@ public class VworldConnectionDiagnosticRunner implements ApplicationRunner {
                 String value = response.substring(marker + "VWORLD_HTTP_STATUS=".length()).trim();
                 if (value.matches("[0-9]{3}")) status = value;
             }
-            // Curl output stays private; only status and known error categories are logged.
+            // Only the key-free fixed diagnostic target is used here.
             log.info("[VWORLD-DIAG] transport=CURL_HTTP_1_1 exitCode={} httpStatus={} expectedMissingKey={} elapsedMs={}",
                 process.exitValue(), status, response.contains("PARAM_REQUIRED"), elapsed(started));
+            log.info("[VWORLD-DIAG] transport=CURL_HTTP_1_1 detail={}", safeDetail(response));
+            for (String line : Files.readAllLines(headers, StandardCharsets.UTF_8)) {
+                int colon = line.indexOf(':');
+                if (colon > 0 && allowedHeader(line.substring(0, colon))) {
+                    log.info("[VWORLD-DIAG] transport=CURL_HTTP_1_1 header={}", safeDetail(line));
+                }
+            }
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             failure("CURL_HTTP_1_1", error, started);
@@ -67,6 +78,10 @@ public class VworldConnectionDiagnosticRunner implements ApplicationRunner {
             failure("CURL_HTTP_1_1", error, started);
         } finally {
             if (process != null && process.isAlive()) process.destroyForcibly();
+            if (headers != null) {
+                try { Files.deleteIfExists(headers); }
+                catch (Exception ignored) { /* Key-free diagnostic temporary file. */ }
+            }
             if (output != null) {
                 try { Files.deleteIfExists(output); }
                 catch (Exception ignored) { /* Temporary OS file; contains no API key. */ }
@@ -84,6 +99,7 @@ public class VworldConnectionDiagnosticRunner implements ApplicationRunner {
             HttpResponse<String> response = client.send(request,
                 HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             report("JDK_HTTP_1_1", response.statusCode(), response.body(), started);
+            reportHeaders("JDK_HTTP_1_1", response.headers().map());
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             failure("JDK_HTTP_1_1", error, started);
@@ -109,6 +125,7 @@ public class VworldConnectionDiagnosticRunner implements ApplicationRunner {
                 }
             }
             report("URL_CONNECTION", status, body, started);
+            reportHeaders("URL_CONNECTION", connection.getHeaderFields());
         } catch (Exception error) {
             failure("URL_CONNECTION", error, started);
         } finally {
@@ -117,9 +134,10 @@ public class VworldConnectionDiagnosticRunner implements ApplicationRunner {
     }
 
     private void report(String transport, int status, String body, long started) {
-        // Never log response bodies, cookies, API keys, or environment values.
+        // A short redacted body from the fixed key-free diagnostic target only.
         log.info("[VWORLD-DIAG] transport={} httpStatus={} expectedMissingKey={} elapsedMs={}",
             transport, status, body.contains("PARAM_REQUIRED"), elapsed(started));
+        log.info("[VWORLD-DIAG] transport={} body={}", transport, safeDetail(body));
     }
 
     private void failure(String transport, Exception error, long started) {
@@ -129,6 +147,30 @@ public class VworldConnectionDiagnosticRunner implements ApplicationRunner {
         }
         log.warn("[VWORLD-DIAG] transport={} failure={} rootCause={} elapsedMs={}",
             transport, error.getClass().getSimpleName(), root.getClass().getSimpleName(), elapsed(started));
+        log.warn("[VWORLD-DIAG] transport={} failureDetail={}", transport, safeDetail(root.getMessage()));
+    }
+
+    private static boolean allowedHeader(String name) {
+        return name != null && List.of("server", "via", "content-type", "content-length")
+            .contains(name.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    private void reportHeaders(String transport, Map<String, List<String>> headers) {
+        headers.forEach((name, values) -> {
+            if (allowedHeader(name)) {
+                log.info("[VWORLD-DIAG] transport={} header={} value={}",
+                    transport, name, safeDetail(String.join(", ", values)));
+            }
+        });
+    }
+
+    static String safeDetail(String value) {
+        if (value == null || value.isBlank()) return "(empty)";
+        String cleaned = value
+            .replaceAll("(?im)^.*(?:set-cookie|cookie|authorization)\\s*:.*$", "[redacted header]")
+            .replaceAll("(?i)([?&](?:key|token|apikey|api_key)=)[^&\\s]*", "$1[redacted]")
+            .replaceAll("[\\p{Cntrl}]", " ");
+        return cleaned.length() <= 600 ? cleaned : cleaned.substring(0, 600) + "...";
     }
 
     private long elapsed(long started) {
