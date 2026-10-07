@@ -2,6 +2,7 @@ package com.onrender.zipai.config;
 
 import com.onrender.zipai.service.NativeDemoService;
 import com.onrender.zipai.service.ZipaiPasswordService;
+import com.onrender.zipai.service.PropertyListingService;
 import jakarta.servlet.FilterChain;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -37,5 +38,22 @@ class NativeDemoFilterTest {
         assertEquals("체험 답변",((Map<?,?>)rows.get(1)).get("answer"));
         var other=new MockHttpSession();demo.start(other,"user");
         assertEquals(1,((java.util.List<?>)((Map<?,?>)demo.request(other,"/api/inquiries","GET",Map.of(),Map.of())).get("items")).size());
+    }
+    @Test void presentationListingsAndPhotosAreCopiedWithoutOperatingWrites() {
+        var listings=mock(PropertyListingService.class);
+        var source=new java.util.LinkedHashMap<String,Object>(Map.of("id",130005L,"title","발표 매물","dealType","MONTHLY","studyData",true,"imageUrl","/api/properties/images/photo.jpg","imageUrls",new java.util.ArrayList<>(java.util.List.of("/api/properties/images/photo.jpg"))));
+        when(listings.find(null,null,true)).thenReturn(java.util.List.of(source));
+        var liveDemo=new NativeDemoService(new ZipaiPasswordService(),listings);
+        var visitor=new MockHttpSession();liveDemo.start(visitor,"user");
+        var catalog=(java.util.List<?>)((Map<?,?>)liveDemo.request(visitor,"/api/properties","GET",Map.of(),Map.of())).get("items");
+        assertEquals(1,catalog.size());assertEquals(source.get("imageUrl"),((Map<?,?>)catalog.get(0)).get("imageUrl"));
+        liveDemo.start(visitor,"admin");
+        var adminCatalog=(java.util.List<?>)((Map<?,?>)liveDemo.request(visitor,"/api/admin/properties","GET",Map.of(),Map.of())).get("items");
+        assertEquals(130005L,((Map<?,?>)adminCatalog.get(0)).get("id"));
+        liveDemo.request(visitor,"/api/admin/properties/130005/status","PATCH",Map.of("status","closed"),Map.of());
+        assertFalse(source.containsKey("status"));
+        var other=new MockHttpSession();liveDemo.start(other,"user");
+        assertEquals(1,((java.util.List<?>)((Map<?,?>)liveDemo.request(other,"/api/properties","GET",Map.of(),Map.of())).get("items")).size());
+        verify(listings,times(2)).find(null,null,true);verifyNoMoreInteractions(listings);
     }
 }

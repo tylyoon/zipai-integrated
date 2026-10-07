@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -18,7 +19,12 @@ public class NativeDemoService {
     public static final String MODE="ZIPAI_NATIVE_DEMO_MODE";
     private static final String DATA="ZIPAI_NATIVE_DEMO_DATA";
     private final ZipaiPasswordService passwords;
-    public NativeDemoService(ZipaiPasswordService passwords) { this.passwords=passwords; }
+    private final PropertyListingService listings;
+    public NativeDemoService(ZipaiPasswordService passwords) { this(passwords,null); }
+    @Autowired
+    public NativeDemoService(ZipaiPasswordService passwords,PropertyListingService listings) {
+        this.passwords=passwords;this.listings=listings;
+    }
     public static String mode(HttpSession session) {
         if(session==null) return null;
         Object mode=session.getAttribute(MODE);
@@ -32,7 +38,7 @@ public class NativeDemoService {
     public void end(HttpSession session) { session.removeAttribute(MODE);session.removeAttribute(DATA); }
     private static class State implements Serializable {
         private static final long serialVersionUID=1L;
-        long next=91000100;
+        long next=91000100;boolean listingsLoaded;
         Map<String,Object> account=new LinkedHashMap<>();String hash;
         List<Map<String,Object>> properties=new ArrayList<>(),visits=new ArrayList<>(),inquiries=new ArrayList<>(),posts=new ArrayList<>(),comments=new ArrayList<>(),offers=new ArrayList<>(),notifications=new ArrayList<>(),audit=new ArrayList<>(),finance=new ArrayList<>();
         List<Long> favorites=new ArrayList<>();Map<String,Object> diagnosis;
@@ -48,6 +54,39 @@ public class NativeDemoService {
             s.finance.add(map("id",91000005L,"policyId",91000005L,"policyName","체험 청년 주거 금융정책","category","청년","targetType","청년","limitInfo","체험 한도","rateInfo","체험 금리","description","실제 정책이 아닌 체험 예시입니다.","sourceName","체험 수집","sourceUrl","/board/finance-policy","snapshotExcerpt","체험 정책 변경 후보입니다.","status","pending","detectedAt",now()));
             session.setAttribute(DATA,s);return s;
         }
+    }
+    private void loadPresentationListings(State s) {
+        if(s.listingsLoaded || listings==null) return;
+        // 공개 매물 조회만 사용합니다. 운영 데이터 변경 서비스는 호출하지 않습니다.
+        List<Map<String,Object>> actual=listings.find(null,null,true);
+        List<Map<String,Object>> snapshot=new ArrayList<>();
+        for(var source:actual) {
+            var row=new LinkedHashMap<String,Object>(source);
+            for(var entry:source.entrySet()) if(entry.getValue() instanceof List<?> values)
+                row.put(entry.getKey(),new ArrayList<>(values));
+            row.put("status","active");row.putIfAbsent("owner","발표용 매물");
+            row.put("demoSnapshot",true);snapshot.add(row);
+        }
+        s.properties.removeIf(row->((Number)row.get("id")).longValue()==91000001L);
+        s.properties.addAll(snapshot);
+        if(!snapshot.isEmpty()) {
+            var first=snapshot.get(0);
+            for(var visit:s.visits) if(((Number)visit.get("id")).longValue()==91000003L) {
+                visit.put("roomId","LISTING-"+first.get("id"));visit.put("title",first.get("title"));
+            }
+            for(var row:snapshot) s.next=Math.max(s.next,((Number)row.get("id")).longValue()+1);
+        } else s.visits.removeIf(row->((Number)row.get("id")).longValue()==91000003L);
+        s.listingsLoaded=true;
+    }
+    private static List<Map<String,Object>> visibleProperties(State s,Map<String,String> query) {
+        String deal=query.getOrDefault("dealType","");
+        boolean includeStudy=!"false".equalsIgnoreCase(query.getOrDefault("includeStudy","true"));
+        Set<Long> ids=new java.util.HashSet<>();
+        if(query.containsKey("ids")) for(String id:query.get("ids").split(",")) ids.add(Long.parseLong(id.trim()));
+        return copy(s.properties.stream().filter(p->"active".equals(p.get("status")))
+            .filter(p->deal.isBlank() || deal.equalsIgnoreCase(String.valueOf(p.get("dealType"))))
+            .filter(p->includeStudy || !Boolean.TRUE.equals(p.get("studyData")))
+            .filter(p->ids.isEmpty() || ids.contains(((Number)p.get("id")).longValue())).toList());
     }
     public void multipart(jakarta.servlet.http.HttpServletRequest request,Map<String,Object> body) throws Exception {
         List<String> images=new ArrayList<>();long imageBytes=0;
@@ -81,6 +120,8 @@ public class NativeDemoService {
         String mode=mode(session);if(mode==null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"체험을 시작해 주세요.");
         State s=state(session);
         synchronized(s) {
+            if(path.startsWith("/api/properties") || path.startsWith("/api/admin/properties")
+                    || path.equals("/api/favorites") || path.equals("/api/admin/summary")) loadPresentationListings(s);
             if(body.containsKey("imageUrl") || body.containsKey("imageUrls")) {
                 long existing=0;
                 for(var rows:List.of(s.properties,s.posts,s.offers)) for(var row:rows) existing+=imageSize(row);
@@ -119,12 +160,12 @@ public class NativeDemoService {
             if(path.equals("/api/admin/properties") || path.equals("/api/properties/mine")) return items(copy(s.properties));
             if(path.equals("/api/properties")) {
                 if(method.equals("POST")) {var p=property(s.next++,body);add(s.properties,p);audit(s,"체험 매물 등록",p.get("id"));return map("item",p,"success",true);}
-                return items(copy(s.properties));
+                return items(visibleProperties(s,query));
             }
             if(path.matches("/api/(admin/)?properties/[0-9]+(/status)?")) {
                 boolean admin=path.startsWith("/api/admin/");long id=id(path,admin?4:3);var p=find(s.properties,id);
                 if(method.equals("DELETE")) {s.properties.remove(p);s.favorites.remove(id);}
-                else if(path.endsWith("/status")) p.put("status",text(body,"status","active"));
+                else if(path.endsWith("/status")) p.put("status",text(body,"status","active").equals("approved")?"active":text(body,"status","active"));
                 else if(method.equals("PUT")) {var replacement=property(id,body);if(!body.containsKey("imageUrls")) {replacement.put("imageUrls",p.get("imageUrls"));replacement.put("imageUrl",p.get("imageUrl"));}p.clear();p.putAll(replacement);}
                 if(!method.equals("GET")) audit(s,"매물 변경",id);
                 return map("item",new LinkedHashMap<>(p),"success",true,"comparable",List.of());
