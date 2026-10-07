@@ -20,6 +20,14 @@ public class MemberAccessConfig implements WebMvcConfigurer {
             public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
                     throws Exception {
                 var session = request.getSession(false);
+                String demoMode = com.onrender.zipai.service.NativeDemoService.mode(session);
+                if (demoMode != null) {
+                    if (request.getRequestURI().equals("/admin") && !demoMode.equals("admin")) {
+                        response.sendRedirect("/demo/start?mode=admin");
+                        return false;
+                    }
+                    return true;
+                }
                 var user = session == null ? null : auth.current(session);
                 if (request.getRequestURI().equals("/admin")) {
                     if (user == null) {

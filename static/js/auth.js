@@ -382,13 +382,27 @@
     resolvePage: resolvePage
   };
 
+  function renderDemoBanner() {
+    const user = getUser();
+    if (!user || !user.demo || document.getElementById('zipaiDemoBanner')) return;
+    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/static/css/native-demo.css?v=20261007-native1'; document.head.appendChild(css);
+    const banner = document.createElement('aside'); banner.id = 'zipaiDemoBanner'; banner.setAttribute('aria-label', '체험 모드');
+    const label = document.createElement('strong'); label.textContent = user.demoMode === 'admin' ? '관리자 체험 중' : '일반 사용자 체험 중';
+    const help = document.createElement('span'); help.textContent = '변경 사항은 이 방문자의 데모 데이터에만 적용됩니다.';
+    const switchMode = document.createElement('a'); switchMode.href = '/demo/start?mode=' + (user.demoMode === 'admin' ? 'user' : 'admin'); switchMode.textContent = user.demoMode === 'admin' ? '일반 사용자로 전환' : '관리자로 전환';
+    const end = document.createElement('a'); end.href = '/demo/end'; end.textContent = '체험 종료';
+    banner.append(label, help, switchMode, end); document.body.prepend(banner);
+  }
+
   function initAuthUi() {
+    renderDemoBanner();
     setupListingAccess();
     refreshHeaderUi();
   }
 
   authReady = refreshUser();
   authReady.then(function () {
+    if (document.readyState !== 'loading') renderDemoBanner();
     if (getUser() && location.pathname === '/' && sessionStorage.getItem('zipaiLoginReturn')) {
       const destination = loginDestination();
       sessionStorage.removeItem('zipaiLoginReturn');

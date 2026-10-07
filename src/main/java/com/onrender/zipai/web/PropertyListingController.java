@@ -83,7 +83,7 @@ public class PropertyListingController {
     @GetMapping("/images/{storedName:.+}")
     public ResponseEntity<Resource> image(@PathVariable String storedName) {
         Resource resource = images.load(storedName);
-        return ResponseEntity.ok().cacheControl(CacheControl.noCache())
+        return ResponseEntity.ok().cacheControl(CacheControl.maxAge(java.time.Duration.ofDays(1)).cachePublic())
                 .contentType(MediaType.parseMediaType(images.contentType(storedName))).body(resource);
     }
 

@@ -3,7 +3,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 env_file="$HOME/zipai-config/zipai.env"
 upload_dir="$HOME/zipai-data/uploads"
-mkdir -p "$upload_dir"
+community_dir="$HOME/zipai-data/static-uploads"
+mkdir -p "$upload_dir" "$community_dir"
 chmod 700 "$HOME/zipai-data"
 test -f "$env_file" || { echo "환경변수 파일 없음: $env_file"; exit 1; }
 for key in DB_URL DB_USERNAME DB_PASSWORD NAVER_MAPS_CLIENT_ID NAVER_MAPS_CLIENT_SECRET; do
@@ -25,6 +26,22 @@ if sudo docker container inspect zipai >/dev/null 2>&1; then
     sudo docker start zipai
     exit 1
   fi
+  # docker cp는 정지된 컨테이너에서도 동작한다.
+  static_backup=$(mktemp -d)
+  if ! sudo docker cp zipai:/app/static/. "$static_backup/"; then
+    sudo rm -rf "$static_backup"
+    echo '커뮤니티 사진 확인 실패. 기존 서버를 다시 시작합니다.'
+    sudo docker start zipai
+    exit 1
+  fi
+  if [ -d "$static_backup/uploads" ]; then
+    if ! sudo cp -a "$static_backup/uploads/." "$community_dir/"; then
+      sudo rm -rf "$static_backup"
+      sudo docker start zipai
+      exit 1
+    fi
+  fi
+  sudo rm -rf "$static_backup"
   sudo docker rename zipai "$backup"
   had_old=true
 fi
@@ -42,6 +59,7 @@ sudo docker run -d --name zipai --restart unless-stopped \
   --env-file "$env_file" \
   -e JAVA_TOOL_OPTIONS="-Xms128m -Xmx512m" \
   --mount "type=bind,source=$upload_dir,target=/app/uploads" \
+  --mount "type=bind,source=$community_dir,target=/app/static/uploads" \
   -p 80:8080 zipai:latest
 ready=false
 for attempt in $(seq 1 60); do

@@ -27,7 +27,7 @@ public class PropertyImageController {
         String contentType = storageService.detectContentType(storedName);
 
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.noCache())
+                .cacheControl(CacheControl.maxAge(java.time.Duration.ofDays(1)).cachePublic())
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(resource);
     }

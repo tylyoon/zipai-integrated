@@ -5,9 +5,9 @@
   const form = document.getElementById('loginForm');
   if (!auth || !form) return;
 
-  const guestBrowse = document.getElementById('loginGuestBrowse');
-  if (guestBrowse) guestBrowse.addEventListener('click', function () {
-    sessionStorage.removeItem('zipaiLoginReturn');
+  ['loginGuestBrowse', 'loginGuestAdmin'].forEach(function (id) {
+    const link = document.getElementById(id);
+    if (link) link.addEventListener('click', function () { sessionStorage.removeItem('zipaiLoginReturn'); });
   });
 
   await auth.ready;

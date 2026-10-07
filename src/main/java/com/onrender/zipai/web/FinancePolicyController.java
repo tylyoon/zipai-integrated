@@ -31,13 +31,16 @@ public class FinancePolicyController {
     private final ZipaiAuthService auth;
     private final FinancePolicyUpdateService updates;
     private final AdminOperationsService adminOperations;
+    private final com.onrender.zipai.service.CollectionHistoryService history;
 
     public FinancePolicyController(FinancePolicyService finance, ZipaiAuthService auth,
-                                   FinancePolicyUpdateService updates, AdminOperationsService adminOperations) {
+                                   FinancePolicyUpdateService updates, AdminOperationsService adminOperations,
+                                   com.onrender.zipai.service.CollectionHistoryService history) {
         this.finance = finance;
         this.auth = auth;
         this.updates = updates;
         this.adminOperations = adminOperations;
+        this.history = history;
     }
 
     @PostMapping("/policy-updates/import")
@@ -46,7 +49,17 @@ public class FinancePolicyController {
         @RequestBody List<Map<String, Object>> snapshots
     ) {
         updates.verifyImportToken(token);
-        return updates.importSnapshots(snapshots);
+        var started = java.time.LocalDateTime.now();
+        Map<String,Object> result;
+        try {
+            result = updates.importSnapshots(snapshots);
+        } catch (RuntimeException error) {
+            try { history.financeResult(started,snapshots.size(),Map.of(),true); }
+            catch (RuntimeException historyError) { error.addSuppressed(historyError); }
+            throw error;
+        }
+        history.financeResult(started,snapshots.size(),result,false);
+        return result;
     }
 
     @GetMapping("/policy-updates")

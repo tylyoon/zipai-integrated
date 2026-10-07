@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ZipAI | 매물 등록</title>
-  <link rel="stylesheet" href="/static/css/common.css"><link rel="stylesheet" href="/static/css/header.css?v=20260916-10"><link rel="stylesheet" href="/static/css/footer.css?v=20260916-10"><link rel="stylesheet" href="/static/css/auth.css"><link rel="stylesheet" href="/static/css/property-management.css?v=20260922-1">
+  <link rel="stylesheet" href="/static/css/common.css?v=20261001-mobile2"><link rel="stylesheet" href="/static/css/header.css?v=20261001-mobile2"><link rel="stylesheet" href="/static/css/footer.css?v=20261001-mobile2"><link rel="stylesheet" href="/static/css/auth.css"><link rel="stylesheet" href="/static/css/property-management.css?v=20260922-1">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
   <script src="/static/js/auth.js" defer></script>
 </head>
@@ -51,7 +51,7 @@
       </div>
       <div class="check-row"><label><input type="checkbox" name="parking" value="true"> 주차 가능</label><label><input type="checkbox" name="elevator" value="true"> 엘리베이터</label><label><input type="checkbox" name="pet" value="true"> 반려동물 협의</label></div>
       <label class="block-label">매물 설명<textarea name="description" rows="5" maxlength="3000" placeholder="매물 특징과 확인할 내용을 입력해 주세요."></textarea></label>
-      <section class="photo-box"><div><strong>매물 사진</strong><small id="photoHelp">JPG · PNG · WEBP / 장당 5MB 이하 / 최대 10장 · 사진을 누르면 대표 사진으로 지정됩니다.</small></div><label class="file-field"><input id="propertyImages" name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple required></label><input id="representativeIndex" name="representativeIndex" type="hidden" value="0"><div id="existingImagePreview" class="image-preview existing-image-preview" hidden></div><div id="imagePreview" class="image-preview"></div></section>
+      <section class="photo-box"><div><strong>매물 사진</strong><small id="photoHelp">JPG · PNG · WEBP / JPG·PNG 장당 5MB, WEBP 512KB 이하 / 최대 10장 · 사진을 누르면 대표 사진으로 지정됩니다.</small></div><label class="file-field"><input id="propertyImages" name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple required></label><input id="representativeIndex" name="representativeIndex" type="hidden" value="0"><div id="existingImagePreview" class="image-preview existing-image-preview" hidden></div><div id="imagePreview" class="image-preview"></div></section>
       <div class="form-actions"><button id="cancelEditButton" class="secondary-btn button-reset" type="button" hidden>수정 취소</button><a class="secondary-btn" href="/">돌아가기</a><button id="salePropertySubmitButton" class="primary-btn" type="submit"><span class="submit-label">매물 등록하기</span><span class="submit-spinner" aria-hidden="true"></span></button></div>
       <p id="registerMessage" class="form-message" aria-live="polite"></p>
     </form>
@@ -65,5 +65,5 @@
   <dialog id="listingDetailDialog" class="listing-detail-dialog"><div class="dialog-heading"><h2 id="listingDetailTitle">매물 상세정보</h2><button id="closeListingDetail" type="button" aria-label="상세정보 닫기">×</button></div><div id="listingDetailContent"></div></dialog>
 </main>
 <footer class="zipai-footer"></footer>
-<script src="/static/js/property-register.js?v=20260922-2" defer></script><script src="/static/js/common-layout.js?v=20260916-10" defer></script>
+<script src="/static/js/property-register.js?v=20261007-photo" defer></script><script src="/static/js/common-layout.js?v=20260916-10" defer></script>
 </body></html>

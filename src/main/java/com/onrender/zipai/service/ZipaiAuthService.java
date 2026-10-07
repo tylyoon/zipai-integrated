@@ -77,7 +77,7 @@ public class ZipaiAuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "아이디는 한글, 영문, 숫자, 밑줄을 사용해 4~20자로 입력해 주세요.");
         }
-        if (!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+        if (email.length() > 254 || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 이메일 주소를 입력해 주세요.");
         }
         if (phone.length() < 10 || phone.length() > 11) {
@@ -154,7 +154,7 @@ public class ZipaiAuthService {
         String email = text(body, "email").toLowerCase();
         String phone = text(body, "phone").replaceAll("[^0-9]", "");
 
-        if (!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+        if (email.length() > 254 || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 이메일 주소를 입력해 주세요.");
         }
         if (phone.length() < 10 || phone.length() > 11) {
@@ -171,14 +171,37 @@ public class ZipaiAuthService {
     }
 
     @Transactional
+    public ZipaiUser changeUsername(Map<String, Object> body, HttpSession session) {
+        ZipaiUser user = required(session);
+        confirmAccount(user, text(body, "currentPassword"), session);
+        String username = text(body, "userId");
+        if (!username.matches("^[A-Za-z0-9_가-힣]{4,20}$"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "아이디는 한글·영문·숫자·밑줄로 4~20자입니다.");
+        if (users.existsByUsernameIgnoreCaseAndIdNot(username, user.getId()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 아이디입니다.");
+        user.setUsername(username);
+        user.setUpdatedAt(LocalDateTime.now());
+        return users.save(user);
+    }
+
+    private void confirmAccount(ZipaiUser user, String password, HttpSession session) {
+        Object verifiedId = session.getAttribute("ZIPAI_SOCIAL_VERIFIED_USER");
+        Object verifiedAt = session.getAttribute("ZIPAI_SOCIAL_VERIFIED_AT");
+        boolean recentSocial = password.isBlank() && user.getId().equals(verifiedId)
+            && verifiedAt instanceof Long instant
+            && System.currentTimeMillis() >= instant
+            && System.currentTimeMillis() - instant < 15 * 60 * 1000L;
+        if (!recentSocial && !passwords.matches(password, user.getPasswordHash()))
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "현재 비밀번호를 확인하거나 SNS로 다시 로그인해 주세요.");
+    }
+
+    @Transactional
     public void changePassword(Map<String, Object> body, HttpSession session) {
         ZipaiUser user = required(session);
         String current = text(body, "currentPassword");
         String next = text(body, "newPassword");
 
-        if (!passwords.matches(current, user.getPasswordHash())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "현재 비밀번호가 올바르지 않습니다.");
-        }
+        confirmAccount(user, current, session);
 
         validateNewPassword(next);
         user.setPasswordHash(passwords.encode(next));
@@ -189,9 +212,7 @@ public class ZipaiAuthService {
     @Transactional
     public void withdraw(Map<String, Object> body, HttpSession session) {
         ZipaiUser user = required(session);
-        if (!passwords.matches(text(body, "password"), user.getPasswordHash())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "비밀번호가 올바르지 않습니다.");
-        }
+        confirmAccount(user, text(body, "password"), session);
 
         user.setStatus("deleted");
         user.setDeletedAt(LocalDateTime.now());
@@ -215,12 +236,12 @@ public class ZipaiAuthService {
     }
 
     private static void validateNewPassword(String password) {
-        if (password.length() < 8 || password.length() > 72
+        if (password.length() < 8 || password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72
                 || !password.matches(".*[A-Za-z].*")
                 || !password.matches(".*[0-9].*")
                 || !password.matches(".*[^A-Za-z0-9].*")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "비밀번호는 8~72자이며 영문, 숫자, 특수문자를 각각 포함해야 합니다.");
+                "비밀번호는 8자 이상·72바이트 이하이며 영문, 숫자, 특수문자를 각각 포함해야 합니다.");
         }
     }
 

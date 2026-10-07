@@ -28,7 +28,11 @@ public class SocialLoginSuccessHandler implements AuthenticationSuccessHandler {
         }
         try {
             ZipaiUser user = socialLogin.login(oauth, request.getSession(true));
+            request.getSession().removeAttribute("ZIPAI_NATIVE_DEMO_MODE");
+            request.getSession().removeAttribute("ZIPAI_NATIVE_DEMO_DATA");
             request.changeSessionId();
+            request.getSession().setAttribute("ZIPAI_SOCIAL_VERIFIED_USER", user.getId());
+            request.getSession().setAttribute("ZIPAI_SOCIAL_VERIFIED_AT", System.currentTimeMillis());
             response.sendRedirect(socialLogin.requiresProfile(user) ? "/member/social-profile" : "/");
         } catch (RuntimeException error) {
             response.sendRedirect("/member/login?oauthError=failed");

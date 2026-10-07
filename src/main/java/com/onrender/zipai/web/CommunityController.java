@@ -10,18 +10,11 @@ import com.onrender.zipai.repository.CommunityPostRepository;
 import com.onrender.zipai.repository.ZipaiUserRepository;
 import com.onrender.zipai.service.ZipaiAuthService;
 import jakarta.servlet.http.HttpSession;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import javax.imageio.ImageIO;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +42,7 @@ public class CommunityController {
     private final ZipaiUserRepository users;
     private final ZipaiAuthService auth;
     private final JdbcTemplate jdbc;
+    private final com.onrender.zipai.service.SharedPhotoStorageService photos;
 
     public CommunityController(
         CommunityPostRepository posts,
@@ -56,7 +50,8 @@ public class CommunityController {
         CommunityPostReportRepository reports,
         ZipaiUserRepository users,
         ZipaiAuthService auth,
-        JdbcTemplate jdbc
+        JdbcTemplate jdbc,
+        com.onrender.zipai.service.SharedPhotoStorageService photos
     ) {
         this.posts = posts;
         this.comments = comments;
@@ -64,6 +59,7 @@ public class CommunityController {
         this.users = users;
         this.auth = auth;
         this.jdbc = jdbc;
+        this.photos = photos;
     }
 
     @GetMapping("/posts")
@@ -221,30 +217,8 @@ public class CommunityController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "JPG, JPEG, PNG 이미지만 업로드할 수 있습니다.");
         }
 
-        try {
-            BufferedImage original = ImageIO.read(file.getInputStream());
-            if (original == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 이미지 파일이 아닙니다.");
-            }
-
-            File dir = new File("static/uploads/community");
-            if (!dir.exists() && !dir.mkdirs()) {
-                throw new IOException("업로드 폴더를 만들 수 없습니다.");
-            }
-
-            String outputFormat = "jpeg".equals(extension) ? "jpg" : extension;
-            String fileName = UUID.randomUUID() + "." + outputFormat;
-            File destination = new File(dir, fileName);
-            BufferedImage output = resize(original, 800, outputFormat);
-            if (!ImageIO.write(output, outputFormat, destination)) {
-                throw new IOException("지원하지 않는 이미지 형식입니다.");
-            }
-            return Map.of("url", "/static/uploads/community/" + fileName);
-        } catch (ResponseStatusException error) {
-            throw error;
-        } catch (IOException error) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장 중 오류가 발생했습니다.");
-        }
+        String storedName = photos.store("community", file, 10L * 1024 * 1024);
+        return Map.of("url", "/static/uploads/community/" + storedName);
     }
 
     private Map<String, Object> postPayload(CommunityPost post, Long userId) {
@@ -296,19 +270,6 @@ public class CommunityController {
     private long count(String sql, Object... args) {
         Long value = jdbc.queryForObject(sql, Long.class, args);
         return value == null ? 0L : value;
-    }
-
-    private static BufferedImage resize(BufferedImage original, int maxWidth, String format) {
-        int width = Math.min(maxWidth, original.getWidth());
-        int height = (int) Math.round(original.getHeight() * (width / (double) original.getWidth()));
-        int imageType = "png".equals(format) ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB;
-        BufferedImage resized = new BufferedImage(width, height, imageType);
-        Graphics2D graphics = resized.createGraphics();
-        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        graphics.drawImage(original, 0, 0, width, height, null);
-        graphics.dispose();
-        return resized;
     }
 
     private static String extension(String fileName) {

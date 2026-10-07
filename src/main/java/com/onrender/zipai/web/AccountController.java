@@ -26,6 +26,11 @@ public class AccountController {
         return Map.of("user", auth.publicUser(auth.updateProfile(body, session)));
     }
 
+    @PutMapping("/username")
+    public Map<String, Object> changeUsername(@RequestBody Map<String, Object> body, HttpSession session) {
+        return Map.of("user", auth.publicUser(auth.changeUsername(body, session)));
+    }
+
     @PutMapping("/password")
     public Map<String, Object> changePassword(@RequestBody Map<String, Object> body, HttpSession session) {
         auth.changePassword(body, session);

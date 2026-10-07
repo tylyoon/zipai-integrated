@@ -227,7 +227,7 @@
     form.reset();
     formModeTitle.textContent = '새 매물 등록';
     formModeHelp.textContent = '매물 정보를 입력하고 사진을 등록해 주세요.';
-    photoHelp.textContent = 'JPG · PNG · WEBP / 장당 5MB 이하 / 최대 10장 · 사진을 누르면 대표 사진으로 지정됩니다.';
+    photoHelp.textContent = 'JPG · PNG · WEBP / JPG·PNG 장당 5MB, WEBP 512KB 이하 / 최대 10장 · 사진을 누르면 대표 사진으로 지정됩니다.';
     cancelEditButton.hidden = true;
     input.required = true;
     input.value = '';
@@ -441,6 +441,11 @@
     const invalidType = files.find(function (file) { return !allowed.has(file.type); });
     if (invalidType) {
       setFieldError(input, 'JPG, PNG, WEBP 파일만 첨부할 수 있습니다.');
+      return false;
+    }
+    const largeWebp = files.find(function (file) { return file.type === 'image/webp' && file.size > 512 * 1024; });
+    if (largeWebp) {
+      setFieldError(input, 'WEBP 사진은 512KB 이하로 줄이거나 JPG·PNG로 변환해 주세요.');
       return false;
     }
     const tooLarge = files.find(function (file) { return file.size > 5 * 1024 * 1024; });

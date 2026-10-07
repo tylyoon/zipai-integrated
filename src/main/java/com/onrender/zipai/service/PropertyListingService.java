@@ -232,8 +232,8 @@ public class PropertyListingService {
                 if (exists != null && exists > 0) updated++; else inserted++;
             } catch (Exception e) { errors++; }
         }
-        jdbc.update("INSERT INTO property_crawl_history (source_name,started_at,finished_at,collected_count,inserted_count,updated_count,error_count,message) VALUES (?,?,?,?,?,?,?,?)",
-                sourceName, Timestamp.valueOf(started), Timestamp.valueOf(LocalDateTime.now()), items.size(), inserted, updated, errors, errors == 0 ? "SUCCESS" : "PARTIAL");
+        jdbc.update("INSERT INTO property_crawl_history (category,source_name,started_at,finished_at,collected_count,inserted_count,updated_count,error_count,message) VALUES (?,?,?,?,?,?,?,?,?)",
+                "property", sourceName, Timestamp.valueOf(started), Timestamp.valueOf(LocalDateTime.now()), items.size(), inserted, updated, errors, errors == 0 ? "SUCCESS" : "PARTIAL");
         return Map.of("collected", items.size(), "inserted", inserted, "updated", updated, "errors", errors);
     }
 
@@ -404,8 +404,8 @@ public class PropertyListingService {
                 if (exists != null && exists > 0) updated++; else inserted++;
             } catch (Exception e) { errors++; }
         }
-        jdbc.update("INSERT INTO property_crawl_history (source_name,started_at,finished_at,collected_count,inserted_count,updated_count,error_count,message) VALUES (?,?,?,?,?,?,?,?)",
-                sourceName, Timestamp.valueOf(started), Timestamp.valueOf(LocalDateTime.now()), items.size(), inserted, updated, errors, errors == 0 ? "SUCCESS" : "PARTIAL");
+        jdbc.update("INSERT INTO property_crawl_history (category,source_name,started_at,finished_at,collected_count,inserted_count,updated_count,error_count,message) VALUES (?,?,?,?,?,?,?,?,?)",
+                "market", sourceName, Timestamp.valueOf(started), Timestamp.valueOf(LocalDateTime.now()), items.size(), inserted, updated, errors, errors == 0 ? "SUCCESS" : "PARTIAL");
         return Map.of("collected", items.size(), "inserted", inserted, "updated", updated, "errors", errors);
     }
 
