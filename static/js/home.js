@@ -951,8 +951,7 @@
 
   function toggleFavorite(id) {
     if (!window.ZipaiAuth || !window.ZipaiAuth.getUser()) {
-      showToast('로그인 후 찜한 매물을 저장할 수 있어요.');
-      window.setTimeout(function () { location.href = '/member/login'; }, 700);
+      visitLoginGate();
       return;
     }
     if (favorites.includes(id)) favorites = favorites.filter(function (value) { return value !== id; });
@@ -1277,10 +1276,52 @@
     });
   });
 
-  function openInquiry(id) { const property = properties.find(function (item) { return item.id === id; }); inquiryModal.dataset.id = id; document.getElementById('inquiryPropertyName').textContent = property.title + ' · ' + dealLabel(property) + ' ' + priceText(property); openSheet(inquiryModal); }
+  function visitLoginGate() {
+    if (window.ZipaiAuth && window.ZipaiAuth.getUser()) return true;
+    const target = location.pathname + location.search + location.hash;
+    sessionStorage.setItem('zipaiLoginReturn', target);
+    window.alert('로그인 후 이용할 수 있습니다.');
+    location.href = '/member/login?returnTo=' + encodeURIComponent(target);
+    return false;
+  }
+  function prepareVisitFields() {
+    if (document.getElementById('homeVisitDate')) return;
+    const fields = document.createElement('div');
+    fields.innerHTML = '<label style="display:block;margin:12px 0">방문 희망일 <input id="homeVisitDate" type="date" required></label>' +
+      '<label style="display:block;margin:12px 0">방문 희망시간 <input id="homeVisitTime" type="time" required></label>' +
+      '<p>신청 후 마이페이지에서 처리 상태를 확인하세요. 운영자가 등록한 매물은 관리자가 처리합니다.</p>';
+    document.getElementById('submitInquiry').before(fields);
+    const today = new Date();
+    today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+    document.getElementById('homeVisitDate').min = today.toISOString().slice(0, 10);
+  }
+  function openInquiry(id) { if (!visitLoginGate()) return; prepareVisitFields(); const property = properties.find(function (item) { return item.id === id; }); inquiryModal.dataset.id = id; document.getElementById('inquiryPropertyName').textContent = property.title + ' · ' + dealLabel(property) + ' ' + priceText(property); openSheet(inquiryModal); }
   inquiryModal.querySelector('.inquiry-close').addEventListener('click', function () { closeSheet(inquiryModal); });
   document.getElementById('phoneInput').addEventListener('input', function () { const number = this.value.replace(/[^0-9]/g,'').slice(0,11); this.value = number.length > 7 ? number.slice(0,3) + '-' + number.slice(3,7) + '-' + number.slice(7) : number.length > 3 ? number.slice(0,3) + '-' + number.slice(3) : number; });
-  document.getElementById('submitInquiry').addEventListener('click', function () { const phone = document.getElementById('phoneInput'); if (phone.value.replace(/[^0-9]/g,'').length < 10) { phone.focus(); showToast('연락받을 휴대폰 번호를 확인해 주세요.'); return; } closeSheet(inquiryModal); phone.value = ''; showToast('데모 상담 신청이 완료됐어요.'); });
+  document.getElementById('submitInquiry').addEventListener('click', async function () {
+    if (!visitLoginGate()) return;
+    const phone = document.getElementById('phoneInput');
+    const date = document.getElementById('homeVisitDate');
+    const time = document.getElementById('homeVisitTime');
+    if (phone.value.replace(/[^0-9]/g, '').length < 10) { phone.focus(); showToast('연락받을 휴대폰 번호를 확인해 주세요.'); return; }
+    if (!date || !date.reportValidity() || !time.reportValidity()) return;
+    const submit = document.getElementById('submitInquiry'); submit.disabled = true;
+    try {
+      const response = await fetch('/api/visits', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: 'LISTING-' + inquiryModal.dataset.id, date: date.value, time: time.value, phone: phone.value })
+      });
+      const payload = await response.json().catch(function () { return {}; });
+      if (response.status === 401) {
+        if (window.ZipaiAuth && window.ZipaiAuth.refreshUser) await window.ZipaiAuth.refreshUser();
+        visitLoginGate(); return;
+      }
+      if (!response.ok) throw new Error(payload.message || '방문 신청을 저장하지 못했습니다.');
+      closeSheet(inquiryModal); phone.value = ''; date.value = ''; time.value = '';
+      showToast('방문 신청이 저장됐습니다. 마이페이지에서 확인하세요.');
+    } catch (error) { showToast(error.message); }
+    finally { submit.disabled = false; }
+  });
   [filterSheet, inquiryModal].forEach(function (sheet) { sheet.addEventListener('click', function (event) { if (event.target === sheet) closeSheet(sheet); }); });
   document.addEventListener('keydown', function (event) { if (event.key === 'Escape') { closeSheet(filterSheet); closeSheet(inquiryModal); closeSheet(listingRegistrationModal); closeDetail(); } });
   document.querySelectorAll('[data-demo-link],[data-demo-button]').forEach(function (item) { item.addEventListener('click', function (event) { event.preventDefault(); showToast('이 메뉴는 메인 홈 데모에서 준비 중이에요.'); }); });

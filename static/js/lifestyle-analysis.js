@@ -7,6 +7,7 @@
 
   const visitKey = 'zipaiRoomVisits';
   const offerKey = 'zipaiRoomOffers';
+  let activityError = false;
   let visitCache = [];
   let offerCache = [];
   const roomList = document.getElementById('availableRooms');
@@ -107,11 +108,17 @@
     }
     const response = await fetch(path, requestOptions);
     const payload = await response.json().catch(function () { return {}; });
-    if (!response.ok) throw new Error(payload.message || '서버 요청을 처리하지 못했습니다.');
+    if (!response.ok) {
+      if (response.status === 401 && window.ZipaiAuth) await window.ZipaiAuth.requireMember();
+      throw new Error(payload.message || '서버 요청을 처리하지 못했습니다. 다시 시도해 주세요.');
+    }
     return payload;
   }
 
   async function loadServerActivity() {
+    if (!window.ZipaiAuth || !window.ZipaiAuth.getUser()) {
+      visitCache = []; offerCache = []; return;
+    }
     const results = await Promise.all([api('/api/visits'), api('/api/room-offers')]);
     visitCache = results[0].items || [];
     offerCache = results[1].items || [];
@@ -578,15 +585,31 @@
   function renderActivity() {
     const visits = read(visitKey);
     const offers = read(offerKey);
+    const logged = window.ZipaiAuth && window.ZipaiAuth.getUser();
+    if (logged && activityError) {
+      document.getElementById('visitCount').textContent = '조회 실패';
+      document.getElementById('offerCount').textContent = '조회 실패';
+      document.getElementById('visitList').textContent = '내역을 불러오지 못했습니다. 페이지를 새로고침해 주세요.';
+      document.getElementById('offerList').textContent = '내역을 불러오지 못했습니다. 페이지를 새로고침해 주세요.';
+      return;
+    }
+    if (!logged) {
+      document.getElementById('visitCount').textContent = '로그인 필요';
+      document.getElementById('offerCount').textContent = '로그인 필요';
+      const message = '<div class="activity-empty"><a href="/member/login?returnTo=%2Fai%2Flifestyle-analysis">로그인 후 내 활동을 확인하세요.</a></div>';
+      document.getElementById('visitList').innerHTML = message;
+      document.getElementById('offerList').innerHTML = message;
+      return;
+    }
     document.getElementById('visitCount').textContent = visits.length + '건';
     document.getElementById('offerCount').textContent = offers.length + '건';
     document.getElementById('visitList').innerHTML = visits.length ? visits.map(function (item) {
       const status = item.status || 'pending';
-      const statusText = status === 'approved' ? '예약 확정' : status === 'rejected' ? '요청 거절' : '승인 대기';
-      const actions = status === 'pending'
+      const statusText = ({ approved: '예약 확정', rejected: '요청 거절', pending: '승인 대기', reschedule_requested: '일정 변경 요청', completed: '방문 완료', no_show: '미방문', cancelled_by_user: '신청자 취소', cancelled_by_admin: '관리자 취소' })[status] || '상태 확인';
+      const actions = status === 'pending' && item.manageable
         ? '<div class="approval-actions"><button type="button" data-action="approve" data-visit-id="' + item.id + '">승인</button><button type="button" data-action="reject" data-visit-id="' + item.id + '">거절</button></div>'
         : '';
-      return '<div class="activity-item"><div><strong>' + escapeHtml(item.title) + '</strong><small>' + escapeHtml(item.date) + ' · ' + escapeHtml(item.time) + ' · ' + escapeHtml(formatPhone(item.phone)) + '</small>' + actions + '</div><span class="activity-status is-' + status + '">' + statusText + '</span></div>';
+      return '<div class="activity-item"><div><strong>' + escapeHtml(item.title) + '</strong><small>' + (item.manageable ? '받은 요청 · ' : '내 신청 · ') + escapeHtml(item.date) + ' · ' + escapeHtml(item.time) + ' · ' + escapeHtml(formatPhone(item.phone)) + '</small>' + actions + '</div><span class="activity-status is-' + status + '">' + statusText + '</span></div>';
     }).join('') : '<div class="activity-empty">신청한 방문 일정이 없습니다.</div>';
     document.getElementById('offerList').innerHTML = offers.length ? offers.map(function (item) {
       const image = item.imageUrls && item.imageUrls.length
@@ -680,6 +703,7 @@
 
   visitForm.addEventListener('submit', async function (event) {
     event.preventDefault();
+    if (!window.ZipaiAuth || !await window.ZipaiAuth.requireMember()) return;
     const data = new FormData(visitForm);
     const room = rooms.find(function (item) { return item.id === data.get('room'); });
     if (!room) {
@@ -693,7 +717,8 @@
     }
     try {
       const payload = await api('/api/visits', { method: 'POST', body: JSON.stringify({ roomId: room.id, title: room.title, date: data.get('date'), time: data.get('time'), phone: formatPhone(data.get('phone')), question: data.get('question') }) });
-      visitCache.unshift(payload.item);
+      await loadServerActivity();
+      activityError = false;
     } catch (error) {
       showToast(error.message);
       return;
@@ -775,6 +800,7 @@
 
   offerForm.addEventListener('submit', async function (event) {
     event.preventDefault();
+    if (!window.ZipaiAuth || !await window.ZipaiAuth.requireMember()) return;
 
     const images = offerImages ? Array.from(offerImages.files || []) : [];
     if (!images.length) {
@@ -790,7 +816,8 @@
 
     try {
       const payload = await api('/api/room-offers', { method: 'POST', body: data });
-      offerCache.unshift(payload.item);
+      await loadServerActivity();
+      activityError = false;
 
       const district = String(data.get('district') || '');
       const matchedArea = lifestyleAreas.find(function (area) {
@@ -859,6 +886,7 @@
   try {
     await loadServerActivity();
   } catch (error) {
+    activityError = true;
     showToast(error.message);
   }
   try {

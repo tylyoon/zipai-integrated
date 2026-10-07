@@ -11,6 +11,8 @@ import com.onrender.zipai.domain.RoomVisit;
 public interface RoomVisitRepository extends CrudRepository<RoomVisit, Long> {
 
     List<RoomVisit> findAllByOrderByVisitIdDesc();
+    List<RoomVisit> findByApplicantUserIdOrderByVisitIdDesc(Long userId);
+    List<RoomVisit> findByOwnerUserIdOrderByVisitIdDesc(Long userId);
 
     List<RoomVisit> findByRoomIdAndVisitDateAndVisitTimeAndStatus(
             String roomId,

@@ -40,6 +40,9 @@
     loadLatestDiagnosis();
     loadNotifications();
     loadInquiries();
+    loadVisits();
+    const adminLink = document.getElementById('mypageAdminLink');
+    if (adminLink) adminLink.hidden = user.role !== 'admin';
   }
 
   async function loadFavorites() {
@@ -192,6 +195,77 @@
     await auth.logout();
     window.location.href = auth.resolvePage('login.html');
   });
+
+
+  const visitMessage = document.getElementById('mypageVisitMessage');
+  const visitRefresh = document.getElementById('mypageRefreshVisits');
+  async function visitApi(path, options) {
+    const response = await fetch(path, { credentials: 'same-origin', ...(options || {}) });
+    const payload = await response.json().catch(function () { return {}; });
+    if (!response.ok) {
+      if (response.status === 401) await auth.requireMember();
+      throw new Error(payload.message || '방문 요청을 처리하지 못했습니다.');
+    }
+    return payload;
+  }
+  function renderVisits(targetId, items, received) {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    target.replaceChildren();
+    if (!items.length) {
+      const empty = document.createElement('p');
+      empty.textContent = received ? '받은 방문 요청이 없습니다.' : '신청한 방문 일정이 없습니다.';
+      target.appendChild(empty); return;
+    }
+    const labels = { pending: '승인 대기', approved: '예약 확정', rejected: '요청 거절', reschedule_requested: '일정 변경 요청', completed: '방문 완료', no_show: '미방문', cancelled_by_user: '신청자 취소', cancelled_by_admin: '관리자 취소' };
+    items.forEach(function (item) {
+      const article = document.createElement('article');
+      article.className = 'mypage-visit-item';
+      const title = document.createElement('strong');
+      const details = document.createElement('p');
+      const status = document.createElement('span');
+      title.textContent = item.title;
+      details.textContent = item.date + ' · ' + item.time + (received ? ' · 연락처 ' + item.phone : '');
+      status.textContent = labels[item.status] || '상태 확인';
+      article.append(title, details, status);
+      if (received && item.question) {
+        const question = document.createElement('p'); question.textContent = item.question; article.appendChild(question);
+      }
+      if (received && item.manageable && item.status === 'pending') {
+        const actions = document.createElement('div'); actions.className = 'mypage-visit-actions';
+        ['approve', 'reject'].forEach(function (action) {
+          const button = document.createElement('button'); button.type = 'button';
+          button.textContent = action === 'approve' ? '승인' : '거절';
+          button.addEventListener('click', async function () {
+            actions.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+            try {
+              await visitApi('/api/visits/' + item.id + '/' + action, { method: 'PATCH' });
+              visitMessage.textContent = action === 'approve' ? '방문 요청을 승인했습니다.' : '방문 요청을 거절했습니다.';
+              await loadVisits();
+            } catch (error) { visitMessage.textContent = error.message; }
+            finally { actions.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); }
+          });
+          actions.appendChild(button);
+        });
+        article.appendChild(actions);
+      }
+      target.appendChild(article);
+    });
+  }
+  async function loadVisits() {
+    if (!document.getElementById('mypageSentVisits')) return;
+    try {
+      const data = await visitApi('/api/visits/activity');
+      renderVisits('mypageSentVisits', data.sent || [], false);
+      renderVisits('mypageReceivedVisits', data.received || [], true);
+    } catch (error) {
+      ['mypageSentVisits', 'mypageReceivedVisits'].forEach(function (id) {
+        document.getElementById(id).textContent = '내역을 불러오지 못했습니다. 새로고침으로 다시 확인하세요.';
+      });
+      visitMessage.textContent = error.message;
+    }
+  }
+  if (visitRefresh) visitRefresh.addEventListener('click', loadVisits);
 
   render();
 })();

@@ -110,3 +110,14 @@
   .mypage-summary { grid-template-columns: 1fr; }
   .mypage-summary div + div { padding-top: 12px; margin-top: 12px; border-top: 1px solid #edf1f6; border-left: 0; }
 }
+
+.mypage-visits { margin: 12px 0 24px; }
+.mypage-visit-item { padding: 16px; margin: 10px 0; border: 1px solid #dde5f0; border-radius: 12px; overflow-wrap: anywhere; }
+.mypage-visit-item p { margin: 8px 0; }
+.mypage-visit-item > span { display: inline-block; padding: 4px 10px; border-radius: 20px; background: #edf3ff; color: #254b8e; }
+.mypage-visit-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.mypage-visit-actions button, #mypageRefreshVisits { padding: 8px 14px; border: 1px solid #b8c9e0; border-radius: 8px; background: #fff; cursor: pointer; }
+.mypage-visit-actions button:disabled { opacity: .5; cursor: wait; }
+#mypageVisitMessage { color: #254b8e; }
+#mypageAdminLink { display: block; margin: 12px 0; }
+#mypageAdminLink[hidden] { display: none; }

@@ -111,6 +111,18 @@
     async function sendMessage(message) {
       const trimmed = String(message || '').trim();
       if (!trimmed) return;
+      if (window.ZipaiAuth) {
+        if (window.ZipaiAuth.requireMember) {
+          if (!await window.ZipaiAuth.requireMember()) return;
+        } else {
+          await window.ZipaiAuth.ready;
+          if (!window.ZipaiAuth.getUser()) {
+            sessionStorage.setItem('zipaiLoginReturn', location.pathname + location.search + location.hash);
+            window.alert('로그인 후 이용할 수 있습니다.');
+            location.href = '/member/login'; return;
+          }
+        }
+      }
 
       addMessage(messages, 'user', trimmed);
       input.value = '';

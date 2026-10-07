@@ -3,6 +3,11 @@ package com.onrender.zipai.service;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +36,7 @@ public class RoomConnectService {
     private static final String READY = "ready";
 
 
+    private final JdbcTemplate jdbc;
     private final RoomVisitRepository roomVisitRepository;
     private final RoomOfferRepository roomOfferRepository;
     private final LifestylePropertyRepository lifestylePropertyRepository;
@@ -39,12 +45,14 @@ public class RoomConnectService {
     private final PropertyImageStorageService imageStorageService;
 
     public RoomConnectService(
+            JdbcTemplate jdbc,
             RoomVisitRepository roomVisitRepository,
             RoomOfferRepository roomOfferRepository,
             LifestylePropertyRepository lifestylePropertyRepository,
             LifestyleAreaRepository lifestyleAreaRepository,
             PropertyImageRepository propertyImageRepository,
             PropertyImageStorageService imageStorageService) {
+        this.jdbc = jdbc;
         this.roomVisitRepository = roomVisitRepository;
         this.roomOfferRepository = roomOfferRepository;
         this.lifestylePropertyRepository = lifestylePropertyRepository;
@@ -54,87 +62,136 @@ public class RoomConnectService {
     }
 
     @Transactional(readOnly = true)
-    public List<RoomVisitResponse> getVisits() {
-        return roomVisitRepository.findAllByOrderByVisitIdDesc()
-                .stream()
-                .map(RoomVisitResponse::from)
-                .toList();
+    public List<RoomVisitResponse> getVisits(Long userId) {
+        return java.util.stream.Stream.concat(
+                roomVisitRepository.findByApplicantUserIdOrderByVisitIdDesc(userId).stream(),
+                roomVisitRepository.findByOwnerUserIdOrderByVisitIdDesc(userId).stream())
+            .collect(java.util.stream.Collectors.toMap(RoomVisit::getVisitId, v -> v, (a, b) -> a))
+            .values().stream().sorted(java.util.Comparator.comparing(RoomVisit::getVisitId).reversed())
+            .map(v -> RoomVisitResponse.from(v).forViewer(userId, v)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, List<RoomVisitResponse>> activity(Long userId) {
+        return Map.of(
+            "sent", roomVisitRepository.findByApplicantUserIdOrderByVisitIdDesc(userId).stream()
+                .map(v -> RoomVisitResponse.from(v).forViewer(userId, v)).toList(),
+            "received", roomVisitRepository.findByOwnerUserIdOrderByVisitIdDesc(userId).stream()
+                .map(v -> RoomVisitResponse.from(v).forViewer(userId, v)).toList());
     }
 
     @Transactional
-    public RoomVisitResponse createVisit(RoomVisitRequest request) {
+    public RoomVisitResponse createVisit(RoomVisitRequest request, Long userId) {
         validateVisitRequest(request);
 
-        LifestyleProperty property = lifestylePropertyRepository
-                .findByPropertyCodeAndActiveTrueAndStatus(request.getRoomId().trim(), READY)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "현재 등록된 방문 가능 매물이 아닙니다."));
-
+        String roomId = request.getRoomId().trim();
+        Long ownerId;
+        String title;
+        if (roomId.matches("LISTING-[0-9]+")) {
+            Long listingId = Long.valueOf(roomId.substring(8));
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT title, owner_user_id FROM property_listing WHERE property_id=? AND status='active'", listingId);
+            if (rows.isEmpty()) throw new IllegalArgumentException("현재 방문 신청 가능한 매물이 아닙니다.");
+            Object owner = rows.get(0).get("owner_user_id");
+            ownerId = owner == null ? null : ((Number) owner).longValue();
+            title = String.valueOf(rows.get(0).get("title"));
+        } else {
+            LifestyleProperty property = lifestylePropertyRepository
+                .findByPropertyCodeAndActiveTrueAndStatus(roomId, READY)
+                .orElseThrow(() -> new IllegalArgumentException("현재 등록된 방문 가능 매물이 아닙니다."));
+            title = property.getTitle();
+            ownerId = roomId.matches("OFFER-[0-9]+")
+                ? roomOfferRepository.findById(Long.valueOf(roomId.substring(6)))
+                    .map(RoomOffer::getOwnerUserId).orElse(null) : null;
+        }
+        if (Objects.equals(userId, ownerId)) {
+            throw new IllegalArgumentException("본인이 등록한 매물에는 방문 신청할 수 없습니다.");
+        }
+        if (!roomVisitRepository.findByRoomIdAndVisitDateAndVisitTimeAndStatus(
+                roomId, request.getDate(), request.getTime(), APPROVED).isEmpty()) {
+            throw new IllegalArgumentException("이미 확정된 방문 일정입니다. 다른 시간을 선택해 주세요.");
+        }
         RoomVisit visit = new RoomVisit();
-        visit.setRoomId(property.getPropertyCode());
-        visit.setTitle(property.getTitle());
+        visit.setRoomId(roomId);
+        visit.setTitle(title);
+        visit.setApplicantUserId(userId);
+        visit.setOwnerUserId(ownerId);
         visit.setVisitDate(request.getDate());
         visit.setVisitTime(request.getTime());
         visit.setPhone(request.getPhone().trim());
         visit.setQuestion(normalizeOptional(request.getQuestion()));
         visit.setStatus(PENDING);
 
-        return RoomVisitResponse.from(roomVisitRepository.save(visit));
+        visit = roomVisitRepository.save(visit);
+        if (ownerId != null) notifyVisit(ownerId, "새 방문 요청", title + " 방문 요청이 도착했습니다.");
+        return RoomVisitResponse.from(visit).forViewer(userId, visit);
     }
 
     @Transactional
-    public RoomVisitResponse approveVisit(Long visitId) {
+    public RoomVisitResponse approveVisit(Long visitId, Long userId) {
         RoomVisit visit = findVisit(visitId);
+        if (!Objects.equals(userId, visit.getOwnerUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "해당 매물 등록자만 처리할 수 있습니다.");
+        }
+        lockRoom(visit.getRoomId());
+        visit = findVisit(visitId);
         requirePending(visit);
 
-        boolean slotTaken = roomVisitRepository
-                .findByRoomIdAndVisitDateAndVisitTimeAndStatus(
-                        visit.getRoomId(),
-                        visit.getVisitDate(),
-                        visit.getVisitTime(),
-                        APPROVED)
-                .stream()
-                .anyMatch(item -> !item.getVisitId().equals(visitId));
+        boolean slotTaken = !jdbc.queryForList(
+            "SELECT visit_id FROM room_visit WHERE room_id=? AND visit_date=? AND visit_time=? AND status='approved' AND visit_id<>? FOR UPDATE",
+            visit.getRoomId(), visit.getVisitDate(), visit.getVisitTime(), visitId).isEmpty();
 
         if (slotTaken) {
             throw new IllegalArgumentException(
                     "이미 승인된 방문 일정입니다. 다른 시간을 선택해 주세요.");
         }
 
-        RoomVisit updated = copyVisitWithStatus(visit, APPROVED);
-        return RoomVisitResponse.from(roomVisitRepository.save(updated));
+        RoomVisit updated = changePendingStatus(visit, APPROVED, userId);
+        if (updated.getApplicantUserId() != null) {
+            notifyVisit(updated.getApplicantUserId(), "방문 요청 처리", updated.getTitle() + " 방문 요청이 "
+                + (APPROVED.equals(updated.getStatus()) ? "승인" : "거절") + "되었습니다.");
+        }
+        return RoomVisitResponse.from(updated).forViewer(userId, updated);
     }
 
     @Transactional
-    public RoomVisitResponse rejectVisit(Long visitId) {
+    public RoomVisitResponse rejectVisit(Long visitId, Long userId) {
         RoomVisit visit = findVisit(visitId);
+        if (!Objects.equals(userId, visit.getOwnerUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "해당 매물 등록자만 처리할 수 있습니다.");
+        }
         requirePending(visit);
 
-        RoomVisit updated = copyVisitWithStatus(visit, REJECTED);
-        return RoomVisitResponse.from(roomVisitRepository.save(updated));
+        RoomVisit updated = changePendingStatus(visit, REJECTED, userId);
+        if (updated.getApplicantUserId() != null) {
+            notifyVisit(updated.getApplicantUserId(), "방문 요청 처리", updated.getTitle() + " 방문 요청이 "
+                + (APPROVED.equals(updated.getStatus()) ? "승인" : "거절") + "되었습니다.");
+        }
+        return RoomVisitResponse.from(updated).forViewer(userId, updated);
     }
 
     @Transactional(readOnly = true)
-    public List<RoomOfferResponse> getOffers() {
-        return roomOfferRepository.findAllByOrderByOfferIdDesc()
+    public List<RoomOfferResponse> getOffers(Long userId) {
+        return roomOfferRepository.findByOwnerUserIdOrderByOfferIdDesc(userId)
                 .stream()
                 .map(this::toOfferResponse)
                 .toList();
     }
 
     @Transactional
-    public RoomOfferResponse createOffer(RoomOfferRequest request) {
-        return createOffer(request, new MultipartFile[0]);
+    public RoomOfferResponse createOffer(RoomOfferRequest request, Long userId) {
+        return createOffer(request, new MultipartFile[0], userId);
     }
 
     @Transactional
     public RoomOfferResponse createOffer(
             RoomOfferRequest request,
-            MultipartFile[] images) {
+            MultipartFile[] images, Long userId) {
         validateOfferRequest(request);
         validateOfferImages(images);
 
         RoomOffer offer = new RoomOffer();
+        offer.setOwnerUserId(userId);
         offer.setTitle(request.getTitle().trim());
         offer.setDistrict(request.getDistrict().trim());
         offer.setDeposit(request.getDeposit());
@@ -252,6 +309,20 @@ public class RoomConnectService {
 
     private record RegionParts(String sido, String sigungu, String detail) {}
 
+    private void notifyVisit(Long userId, String title, String message) {
+        jdbc.update("INSERT INTO user_notification (user_id, notification_type, title, message, target_url, is_read, created_at) VALUES (?, 'visit_status', ?, ?, '/member/mypage#my-visits', FALSE, ?)",
+            userId, title, message, java.time.LocalDateTime.now());
+    }
+
+    private void lockRoom(String roomId) {
+        if (roomId.matches("LISTING-[0-9]+")) {
+            jdbc.queryForList("SELECT property_id FROM property_listing WHERE property_id=? FOR UPDATE",
+                Long.valueOf(roomId.substring(8)));
+        } else {
+            jdbc.queryForList("SELECT property_id FROM lifestyle_property WHERE property_code=? FOR UPDATE", roomId);
+        }
+    }
+
     private RoomVisit findVisit(Long visitId) {
         if (visitId == null) {
             throw new IllegalArgumentException("방문 요청 번호가 필요합니다.");
@@ -268,7 +339,10 @@ public class RoomConnectService {
         }
     }
 
-    private RoomVisit copyVisitWithStatus(RoomVisit visit, String status) {
+    private RoomVisit changePendingStatus(RoomVisit visit, String status, Long ownerId) {
+        int changed = jdbc.update("UPDATE room_visit SET status=?, updated_at=? WHERE visit_id=? AND owner_user_id=? AND status='pending'",
+            status, java.time.LocalDateTime.now(), visit.getVisitId(), ownerId);
+        if (changed == 0) throw new IllegalArgumentException("이미 처리된 방문 요청입니다. 현황을 새로고침해 주세요.");
         visit.setStatus(status);
         return visit;
     }
@@ -278,7 +352,7 @@ public class RoomConnectService {
             throw new IllegalArgumentException("방문 신청 내용이 없습니다.");
         }
         requireText(request.getRoomId(), "방을 선택해 주세요.");
-        requireText(request.getTitle(), "방 제목이 필요합니다.");
+
         if (request.getDate() == null) {
             throw new IllegalArgumentException("방문 희망일을 선택해 주세요.");
         }

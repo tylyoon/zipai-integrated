@@ -32,6 +32,11 @@ public class RoomOffer {
     private String description;
     private String status;
 
+    @Column("owner_user_id")
+    private Long ownerUserId;
+    public Long getOwnerUserId() { return ownerUserId; }
+    public void setOwnerUserId(Long value) { ownerUserId = value; }
+
     public RoomOffer() {
     }
 

@@ -75,6 +75,12 @@ server:
   forward-headers-strategy: framework
 
 zipai:
+  admin:
+    bootstrap-enabled: ${ZIPAI_ADMIN_BOOTSTRAP_ENABLED:false}
+    username: ${ZIPAI_ADMIN_USERNAME:}
+    email: ${ZIPAI_ADMIN_EMAIL:}
+    phone: ${ZIPAI_ADMIN_PHONE:}
+    password: ${ZIPAI_ADMIN_PASSWORD:}
   lifestyle:
     ml:
       python-command: ${ZIPAI_LIFESTYLE_ML_PYTHON_COMMAND:}

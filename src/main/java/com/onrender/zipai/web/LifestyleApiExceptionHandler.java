@@ -18,6 +18,13 @@ public class LifestyleApiExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(LifestyleApiExceptionHandler.class);
 
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<Map<String, String>> handleStatus(
+            org.springframework.web.server.ResponseStatusException exception) {
+        return ResponseEntity.status(exception.getStatusCode())
+            .body(Map.of("message", exception.getReason() == null ? "요청을 확인해 주세요." : exception.getReason()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgument(
             IllegalArgumentException exception) {

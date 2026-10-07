@@ -7,7 +7,7 @@
 
   await auth.ready;
   if (auth.getUser()) {
-    window.location.replace(auth.resolvePage('index.html'));
+    window.location.replace(auth.loginDestination());
     return;
   }
 
@@ -54,7 +54,9 @@
       });
 
       form.reset();
-      window.location.href = auth.resolvePage('index.html');
+      const destination = auth.loginDestination();
+      sessionStorage.removeItem('zipaiLoginReturn');
+      window.location.href = destination;
     } catch (error) {
       let message = form.querySelector('.login-page-error');
       if (!message) {

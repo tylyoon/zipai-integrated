@@ -349,7 +349,28 @@
     setupFraudSubnav();
   }
 
+  function loginDestination() {
+    const raw = new URLSearchParams(location.search).get('returnTo') || sessionStorage.getItem('zipaiLoginReturn') || '/';
+    if (!raw.startsWith('/') || raw.startsWith('//') || /[\\\r\n]/.test(raw)) return '/';
+    const url = new URL(raw, location.origin);
+    if (url.origin !== location.origin || url.pathname.startsWith('/member/login') || url.pathname.startsWith('/oauth2/') || url.pathname.startsWith('/login/')) return '/';
+    return url.pathname + url.search + url.hash;
+  }
+
+  async function requireMember() {
+    await authReady;
+    await refreshUser();
+    if (getUser()) return true;
+    const target = location.pathname + location.search + location.hash;
+    sessionStorage.setItem('zipaiLoginReturn', target);
+    window.alert('로그인 후 이용할 수 있습니다.');
+    location.href = '/member/login?returnTo=' + encodeURIComponent(target);
+    return false;
+  }
+
   window.ZipaiAuth = {
+    requireMember: requireMember,
+    loginDestination: loginDestination,
     getUser: getUser,
     login: login,
     signup: signup,
@@ -367,6 +388,13 @@
   }
 
   authReady = refreshUser();
+  authReady.then(function () {
+    if (getUser() && location.pathname === '/' && sessionStorage.getItem('zipaiLoginReturn')) {
+      const destination = loginDestination();
+      sessionStorage.removeItem('zipaiLoginReturn');
+      if (destination !== '/') location.replace(destination);
+    }
+  });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initAuthUi);
   else initAuthUi();
 })();

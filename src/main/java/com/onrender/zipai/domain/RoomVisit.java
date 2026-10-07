@@ -29,6 +29,16 @@ public class RoomVisit {
     private String question;
     private String status;
 
+    @Column("applicant_user_id")
+    private Long applicantUserId;
+    public Long getApplicantUserId() { return applicantUserId; }
+    public void setApplicantUserId(Long value) { applicantUserId = value; }
+
+    @Column("owner_user_id")
+    private Long ownerUserId;
+    public Long getOwnerUserId() { return ownerUserId; }
+    public void setOwnerUserId(Long value) { ownerUserId = value; }
+
     public RoomVisit() {
     }
 

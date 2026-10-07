@@ -85,9 +85,30 @@ public class AdminOperationsService {
     public void changeVisitStatus(Long adminId, Long visitId, String status) {
         String normalized = status == null ? "" : status.trim().toLowerCase();
         if (!VISIT_STATUSES.contains(normalized)) badRequest("방문 예약 상태를 확인해 주세요.");
+        List<Map<String, Object>> found = jdbc.queryForList(
+            "SELECT room_id, applicant_user_id, title, visit_date, visit_time FROM room_visit WHERE visit_id=?", visitId);
+        if (found.isEmpty()) notFound("방문 예약을 찾을 수 없습니다.");
+        Map<String, Object> visit = found.get(0);
+        if ("approved".equals(normalized)) {
+            String roomId = String.valueOf(visit.get("room_id"));
+            if (roomId.matches("LISTING-[0-9]+")) {
+                jdbc.queryForList("SELECT property_id FROM property_listing WHERE property_id=? FOR UPDATE", Long.valueOf(roomId.substring(8)));
+            } else {
+                jdbc.queryForList("SELECT property_id FROM lifestyle_property WHERE property_code=? FOR UPDATE", roomId);
+            }
+            if (!jdbc.queryForList("SELECT visit_id FROM room_visit WHERE room_id=? AND visit_date=? AND visit_time=? AND status='approved' AND visit_id<>? FOR UPDATE",
+                    roomId, visit.get("visit_date"), visit.get("visit_time"), visitId).isEmpty()) {
+                badRequest("이미 확정된 방문 일정입니다. 다른 시간을 선택해 주세요.");
+            }
+        }
         int changed = jdbc.update("UPDATE room_visit SET status=?, updated_at=? WHERE visit_id=?",
             normalized, LocalDateTime.now(), visitId);
         if (changed == 0) notFound("방문 예약을 찾을 수 없습니다.");
+        Object applicant = visit.get("applicant_user_id");
+        if (applicant instanceof Number userId) {
+            notify(userId.longValue(), "visit_status", "방문 요청 상태가 변경되었습니다",
+                "‘" + visit.get("title") + "’ 방문 요청 상태가 변경되었습니다. 마이페이지에서 확인하세요.", "/member/mypage#my-visits");
+        }
         audit(adminId, "VISIT_STATUS_CHANGED", "visit", String.valueOf(visitId), "status=" + normalized);
     }
 

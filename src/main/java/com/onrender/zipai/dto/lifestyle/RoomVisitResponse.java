@@ -6,6 +6,12 @@ import java.time.format.DateTimeFormatter;
 import com.onrender.zipai.domain.RoomVisit;
 
 public class RoomVisitResponse {
+    private boolean manageable;
+    public boolean isManageable() { return manageable; }
+    public RoomVisitResponse forViewer(Long viewerId, RoomVisit visit) {
+        manageable = viewerId != null && viewerId.equals(visit.getOwnerUserId());
+        return this;
+    }
     private final Long id;
     private final String roomId;
     private final String title;
