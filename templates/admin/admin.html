@@ -9,16 +9,23 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
-  <link rel="stylesheet" href="../../static/css/header.css?v=20261001-mobile2">
-  <link rel="stylesheet" href="../../static/css/footer.css?v=20261001-mobile2">
-  <link rel="stylesheet" href="../../static/css/auth.css?v=20260916-10">
-  <link rel="stylesheet" href="../../static/css/admin.css?v=20260930-1">
-  <script src="../../static/js/auth.js?v=20261007-native1" defer></script>
-  <script src="../../static/js/admin.js?v=20260930-1" defer></script>
+  <link rel="stylesheet" href="/static/css/header.css?v=20261001-mobile2">
+  <link rel="stylesheet" href="/static/css/footer.css?v=20261001-mobile2">
+  <link rel="stylesheet" href="/static/css/auth.css?v=20260916-10">
+  <link rel="stylesheet" href="/static/css/admin.css?v=20261007-layout2">
+  <script src="/static/js/auth.js?v=20261007-native1" defer></script>
+  <script src="/static/js/admin.js?v=20260930-1" defer></script>
   <link rel="stylesheet" href="/static/css/collection-history.css?v=20261007-1">
   <script src="/static/js/collection-history.js?v=20261007-1" defer></script>
+  <link rel="stylesheet" href="/static/css/native-demo.css?v=20261007-native1">
+  <link rel="stylesheet" href="/static/css/admin-layout.css?v=20261007-layout2">
+  <script src="/static/js/admin-layout.js?v=20261007-layout2" defer></script>
 </head>
 <body class="has-zipai-footer">
+  <aside id="zipaiDemoBanner" aria-label="체험 모드" th:if="${session.ZIPAI_NATIVE_DEMO_MODE == 'admin'}">
+    <strong>관리자 체험 중</strong><span>변경 사항은 체험 데이터에만 적용됩니다.</span>
+    <a href="/demo/start?mode=user">일반 사용자로 전환</a><a href="/demo/end">체험 종료</a>
+  </aside>
        <div class="zipai-header"></div>
 
   
@@ -28,7 +35,7 @@
       <section class="admin-view admin-denied admin-panel" data-admin-view="denied" hidden>
         <i class="fa-solid fa-lock" aria-hidden="true"></i>
         <h1>관리자 권한이 필요합니다</h1>
-        <p>관리자 페이지는 admin 아이디로 로그인한 경우에만 이용할 수 있습니다.</p>
+        <p>관리자 권한이 있는 계정으로 로그인해 주세요.</p>
         <button class="admin-switch" id="adminSwitchAccount" type="button">관리자 계정으로 로그인</button>
       </section>
 
@@ -39,7 +46,7 @@
         </div>
 
         <nav class="admin-quick-nav" aria-label="관리 영역 바로가기">
-          <a href="#adminCollectionSection">데이터 수집·반영 이력</a>
+          <a href="#adminCollectionSection"><i class="fa-solid fa-database" aria-hidden="true"></i>수집·반영 이력</a>
           <a href="#adminInquirySection"><i class="fa-regular fa-comments" aria-hidden="true"></i>문의</a>
           <a href="#adminVisitSection"><i class="fa-regular fa-calendar-check" aria-hidden="true"></i>방문 예약</a>
           <a href="#adminPropertySection"><i class="fa-regular fa-building" aria-hidden="true"></i>매물 검토</a>
@@ -131,6 +138,6 @@
   <div class="admin-toast" id="adminToast" role="status" aria-live="polite"></div>
 
   <footer class="zipai-footer"></footer>
-  <script src="../../static/js/common-layout.js?v=20260916-10" defer></script>
+  <script src="/static/js/common-layout.js?v=20260916-10" defer></script>
 </body>
 </html>
