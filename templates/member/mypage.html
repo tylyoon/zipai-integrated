@@ -15,8 +15,8 @@
   <link rel="stylesheet" href="../../static/css/mypage.css?v=20261007-visits1">
   <script src="../../static/js/auth.js?v=20261007-native1" defer></script>
   <script src="../../static/js/mypage.js?v=20261007-visits1" defer></script>
-  <link rel="stylesheet" href="/static/css/account-settings.css?v=20261007-1">
-  <script src="/static/js/account-settings.js?v=20261007-1" defer></script>
+  <link rel="stylesheet" href="/static/css/account-settings.css?v=20261007-modal1">
+  <script src="/static/js/account-settings.js?v=20261007-modal1" defer></script>
 </head>
 <body class="has-zipai-footer">
        <div class="zipai-header"></div>
@@ -51,19 +51,11 @@
             </dl>
             <a id="mypageAdminLink" href="/admin" hidden>관리자 화면</a>
             <button class="mypage-logout" id="mypageLogout" type="button"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> 로그아웃</button>
+            <button class="mypage-account-button" id="accountSettingsOpen" type="button" aria-haspopup="dialog" aria-controls="accountSettingsDialog"><i class="fa-solid fa-user-pen" aria-hidden="true"></i> 개인정보 변경</button>
           </aside>
 
           <div class="mypage-content">
-<section class="mypage-card mypage-section" id="accountSettings">
-  <div class="mypage-section-title"><h2>계정 관리</h2><p>아이디·연락처·비밀번호를 변경하고 회원탈퇴를 진행할 수 있습니다.</p></div>
-  <p>SNS로 다시 로그인한 뒤 15분 이내라면 현재 비밀번호를 비워 두고 아이디 변경·비밀번호 설정·탈퇴를 진행할 수 있습니다. 일반 로그인은 현재 비밀번호를 입력해 주세요.</p>
-  <div class="account-settings-grid">
-    <form id="accountProfileForm" data-account-action="profile"><h3>정보 수정</h3><label>이메일<input name="email" type="email" maxlength="254" autocomplete="email" required></label><label>휴대폰 번호<input name="phone" type="tel" autocomplete="tel" required></label><button type="submit">정보 저장</button></form>
-    <form id="accountUsernameForm" data-account-action="username"><h3>로그인 아이디 변경</h3><label>새 아이디<input name="userId" minlength="4" maxlength="20" autocomplete="username" required></label><label>현재 비밀번호<input name="currentPassword" type="password" autocomplete="current-password"></label><button type="submit">아이디 변경</button></form>
-    <form data-account-action="password"><h3>비밀번호 변경·설정</h3><label>현재 비밀번호<input name="currentPassword" type="password" autocomplete="current-password"></label><label>새 비밀번호<input name="newPassword" type="password" minlength="8" autocomplete="new-password" required></label><label>새 비밀번호 확인<input name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required></label><button type="submit">비밀번호 저장</button></form>
-    <form data-account-action="withdraw"><h3>회원탈퇴</h3><p>탈퇴 시 계정 이용이 종료됩니다.</p><label>현재 비밀번호<input name="password" type="password" autocomplete="current-password"></label><button type="submit" class="account-withdraw">회원탈퇴</button></form>
-  </div><p id="accountSettingsMessage" role="status" aria-live="polite"></p>
-</section>
+
 
             <section class="mypage-card mypage-section" id="my-visits" tabindex="-1">
               <div class="mypage-section-title"><h2>방문 신청 현황</h2><p>내가 신청한 일정과 내 매물에 받은 요청을 확인하세요.</p></div>
@@ -121,11 +113,31 @@
                 <a class="mypage-tool" href="/defense/guide"><i class="fa-solid fa-file-contract" aria-hidden="true"></i><strong>계약 가이드</strong><span>계약 순서와 주의사항</span></a>
               </div>
             </section>
+
+            
           </div>
         </div>
       </div>
     </div>
   </main>
+
+  <dialog id="accountSettingsDialog" class="account-dialog" aria-labelledby="accountDialogTitle">
+    <div class="account-dialog-shell">
+      <header class="account-dialog-heading"><h2 id="accountDialogTitle">개인정보 변경</h2><button id="accountSettingsClose" class="account-dialog-close" type="button" aria-label="개인정보 변경 창 닫기">닫기</button></header>
+<section id="accountSettings">
+  <p class="account-dialog-intro">이메일·전화번호·아이디·비밀번호를 변경할 수 있습니다.</p>
+  <p class="account-verification-note">SNS로 다시 로그인한 뒤 15분 이내라면 현재 비밀번호를 비워 두고 아이디 변경·비밀번호 설정·탈퇴를 진행할 수 있습니다. 일반 로그인은 현재 비밀번호를 입력해 주세요.</p>
+  <div class="account-settings-grid">
+    <form id="accountProfileForm" data-account-action="profile"><h3>정보 수정</h3><label>이메일<input name="email" type="email" maxlength="254" autocomplete="email" required></label><label>휴대폰 번호<input name="phone" type="tel" autocomplete="tel" required></label><button type="submit">정보 저장</button></form>
+    <form id="accountUsernameForm" data-account-action="username"><h3>로그인 아이디 변경</h3><label>새 아이디<input name="userId" minlength="4" maxlength="20" autocomplete="username" required></label><label>현재 비밀번호<input name="currentPassword" type="password" autocomplete="current-password"></label><button type="submit">아이디 변경</button></form>
+    <form data-account-action="password"><h3>비밀번호 변경·설정</h3><label>현재 비밀번호<input name="currentPassword" type="password" autocomplete="current-password"></label><label>새 비밀번호<input name="newPassword" type="password" minlength="8" autocomplete="new-password" required></label><label>새 비밀번호 확인<input name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required></label><button type="submit">비밀번호 저장</button></form>
+
+  </div>
+  <details class="account-withdraw-section"><summary>회원탈퇴</summary>    <form data-account-action="withdraw"><h3>회원탈퇴</h3><p>탈퇴 시 계정 이용이 종료됩니다.</p><label>현재 비밀번호<input name="password" type="password" autocomplete="current-password"></label><button type="submit" class="account-withdraw">회원탈퇴</button></form></details>
+  <p id="accountSettingsMessage" role="status" aria-live="polite"></p>
+</section>
+    </div>
+  </dialog>
 
   <footer class="zipai-footer"></footer>
   <script src="../../static/js/common-layout.js?v=20260916-10" defer></script>
