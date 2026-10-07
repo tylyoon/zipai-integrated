@@ -5,6 +5,11 @@
   const form = document.getElementById('loginForm');
   if (!auth || !form) return;
 
+  const guestBrowse = document.getElementById('loginGuestBrowse');
+  if (guestBrowse) guestBrowse.addEventListener('click', function () {
+    sessionStorage.removeItem('zipaiLoginReturn');
+  });
+
   await auth.ready;
   if (auth.getUser()) {
     window.location.replace(auth.loginDestination());
