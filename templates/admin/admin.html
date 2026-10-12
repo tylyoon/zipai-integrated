@@ -16,7 +16,7 @@
   <script src="/static/js/auth.js?v=20261007-native1" defer></script>
   <script src="/static/js/admin.js?v=20260930-1" defer></script>
   <link rel="stylesheet" href="/static/css/collection-history.css?v=20261007-1">
-  <script src="/static/js/collection-history.js?v=20261007-1" defer></script>
+  <script src="/static/js/collection-history.js?v=20261007-runs2" defer></script>
   <link rel="stylesheet" href="/static/css/native-demo.css?v=20261007-native1">
   <link rel="stylesheet" href="/static/css/admin-layout.css?v=20261007-layout2">
   <script src="/static/js/admin-layout.js?v=20261007-layout2" defer></script>
@@ -56,7 +56,7 @@
         </nav>
 
         <section class="admin-panel" id="adminCollectionSection">
-          <h2>항목별 데이터 수집·반영 이력</h2><p>아파트 실거래·매물·LH 공고·금융 정책을 구분해 확인합니다. 매물·실거래는 서버가 받은 반영 요청, 금융 정책은 검토 후보 수신을 기록합니다. PC의 수집 시작·실패는 현재 이력에 포함되지 않습니다. 시각은 각 기록 서버의 저장 기준입니다.</p>
+          <h2>항목별 데이터 수집·반영 이력</h2><p>아파트 실거래·매물·LH 공고·금융 정책을 구분해 확인합니다. 매물·실거래는 서버가 받은 반영 요청, 금융 정책은 검토 후보 수신을 기록합니다. 아파트 실거래·매물은 PC 전체 실행과 배치별 서버 반영을 구분합니다. 새 실행 시각은 한국 시간, 기존 이력은 기록 서버 기준입니다. 미전송 PC 기록은 연결 복구 후 표시됩니다.</p>
           <div id="collectionHistoryTabs" aria-label="수집 항목 선택"></div><p id="collectionHistoryMessage" role="status"></p>
           <div id="collectionHistoryList" aria-live="polite"></div><div class="collection-history-controls"><button id="collectionHistoryRefresh" type="button">새로고침</button><button id="collectionHistoryPrev" type="button">이전</button><span id="collectionHistoryPage">1</span><button id="collectionHistoryNext" type="button">다음</button></div>
         </section>

@@ -3,19 +3,22 @@
     "policyName": "내집마련 디딤돌 대출",
     "sourceName": "주택도시기금",
     "sourceUrl": "https://nhuf.molit.go.kr/",
-    "keyword": "내집마련 디딤돌"
+    "keyword": "내집마련 디딤돌",
+    "resolveDetail": true
   },
   {
     "policyName": "신혼부부 전용 구입자금",
     "sourceName": "주택도시기금",
     "sourceUrl": "https://nhuf.molit.go.kr/",
-    "keyword": "신혼부부 전용 구입자금"
+    "keyword": "신혼부부 전용 구입자금",
+    "resolveDetail": true
   },
   {
     "policyName": "청년 주택드림 대출",
     "sourceName": "주택도시기금",
     "sourceUrl": "https://nhuf.molit.go.kr/",
-    "keyword": "청년 주택드림"
+    "keyword": "청년 주택드림",
+    "resolveDetail": true
   },
   {
     "policyName": "버팀목 전세자금대출",
@@ -27,7 +30,8 @@
     "policyName": "신혼부부 전용 전세자금",
     "sourceName": "주택도시기금",
     "sourceUrl": "https://nhuf.molit.go.kr/",
-    "keyword": "신혼부부 전용 전세자금"
+    "keyword": "신혼부부 전용 전세자금",
+    "resolveDetail": true
   },
   {
     "policyName": "청년 전용 버팀목 전세자금대출",
