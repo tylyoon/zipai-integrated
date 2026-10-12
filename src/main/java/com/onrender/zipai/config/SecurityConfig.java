@@ -25,6 +25,10 @@ public class SecurityConfig {
                 .successHandler(socialLoginSuccessHandler)
                 .failureUrl("/member/login?oauthError=failed")
             )
+            .headers(headers -> headers
+                .frameOptions(frame -> frame.sameOrigin())
+                .contentSecurityPolicy(csp -> csp.policyDirectives("frame-ancestors 'self'"))
+            )
             .csrf(csrf -> csrf.disable());
 
         return http.build();
