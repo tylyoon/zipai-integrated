@@ -27,8 +27,8 @@
       {say:'개인정보 변경 버튼을 클릭합니다. 이메일, 전화번호, 아이디와 비밀번호 변경 입력 화면을 보여주며, 실제 정보는 변경하지 않습니다.',click:'#accountSettingsOpen',ready:d=>d.querySelector('#accountSettingsDialog')?.open,focus:'#accountSettingsDialog'}]},
     {title:'관리자 · 수집 이력',url:'/demo/start?mode=admin',intro:'관리자 체험 화면으로 전환합니다. 회원, 문의, 매물과 게시글 관리, 수집 항목별 실행 이력을 확인할 수 있습니다. 체험 화면의 관리 데이터는 운영 권한과 구분됩니다.',steps:[
       {say:'수집 이력 새로고침 버튼을 클릭하고 항목별 상태와 실행 내역을 확인합니다.',click:'#collectionHistoryRefresh',ready:d=>!!d.querySelector('#collectionHistoryList')?.textContent.trim(),focus:'#adminCollectionSection'}]},
-    {title:'SNS 로그인',url:'/demo/end',intro:'로그인 화면에는 서버에 설정된 카카오, 네이버와 구글 로그인 버튼이 표시됩니다. EC2와 Render의 설정에 따라 표시되는 제공자가 다를 수 있습니다.',steps:[
-      {say:'현재 사용 가능한 소셜 로그인 버튼을 강조합니다. 클릭하면 외부 제공자의 인증으로 이동하므로 자동 시연에서는 계정 선택과 동의를 실행하지 않습니다. 실제 로그인은 이 화면에서 직접 이어갈 수 있습니다.',ready:d=>Array.from(d.querySelectorAll('[data-social-provider]')).some(e=>!e.hidden),focus:'#socialLogin'}]}
+    {title:'SNS 로그인',url:'/demo/end',screenFirst:true,retryVoice:true,intro:'ZipAI는 일반 회원 로그인과 SNS 로그인을 제공합니다. 카카오, 네이버, 구글 계정을 연결할 수 있으며, 현재 서버에 설정된 로그인 버튼이 표시됩니다. SNS 로그인은 OAuth 2.0을 이용해 외부 서비스에서 인증하고 ZipAI로 돌아오는 방식입니다.',steps:[
+      {say:'이번 시연에서는 실제 계정 인증을 진행하지 않고 로그인 화면과 구성을 소개합니다. 활성화된 SNS 버튼을 누르면 해당 서비스에서 로그인과 정보 제공 동의를 진행할 수 있습니다. 이것으로 ZipAI 기능 시연을 마치겠습니다.',ready:d=>!!d.querySelector('#loginForm'),focus:'#loginForm'}]}
   ];
   const root=document.createElement('section');root.id='liveTour';root.hidden=true;
   root.innerHTML='<header><strong id="liveTitle"></strong><span id="livePosition"></span><button id="livePause">일시정지</button><button id="liveRetry" hidden>현재 장면 재시도</button><button id="liveSkip">다음 장면</button><button id="liveExit">시연 종료</button></header><div id="liveExplanation"><h1></h1><p></p></div><div id="liveStage" hidden><iframe title="ZipAI 실제 기능 자동 시연" id="liveFrame"></iframe></div><p id="liveCaption" role="status"></p>';
@@ -71,8 +71,18 @@
   async function runScene(t){const c=chapters[position];q('#liveRetry').hidden=true;q('#liveTitle').textContent=c.title;q('#livePosition').textContent=(position+1)+' / '+chapters.length;
     q('#liveStage').hidden=true;q('#liveExplanation').hidden=false;q('#liveExplanation h1').textContent=c.title;q('#liveExplanation p').textContent=c.intro;
     try{
-      await say(c.intro,t);if(stale(t))return;
-      q('#liveExplanation').hidden=true;q('#liveStage').hidden=false;resize();await openPage(c.url,t);
+      if(c.retryVoice)speechUnavailable=false;
+      if(c.screenFirst){
+        q('#liveExplanation').hidden=true;q('#liveStage').hidden=false;resize();
+        await openPage(c.url,t);
+        await waitFor(()=>!!frameDoc.querySelector('#loginForm'),t);
+        focus('#loginForm',frameDoc);
+        await say(c.intro,t);
+      }else{
+        await say(c.intro,t);if(stale(t))return;
+        q('#liveExplanation').hidden=true;q('#liveStage').hidden=false;resize();await openPage(c.url,t);
+      }
+      if(stale(t))return;
       for(const step of c.steps){await waitFor(()=>!paused,t);if(stale(t))return;
         // Start speech and UI operation together; neither completion can advance alone.
         await Promise.all([say(step.say,t),(async()=>{
