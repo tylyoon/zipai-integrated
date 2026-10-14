@@ -31,7 +31,7 @@
       {say:'이번 시연에서는 실제 계정 인증을 진행하지 않고 로그인 화면과 구성을 소개합니다. 활성화된 SNS 버튼을 누르면 해당 서비스에서 로그인과 정보 제공 동의를 진행할 수 있습니다. 이것으로 ZipAI 기능 시연을 마치겠습니다.',ready:d=>!!d.querySelector('#loginForm'),focus:'#loginForm'}]}
   ];
   const root=document.createElement('section');root.id='liveTour';root.hidden=true;
-  root.innerHTML='<header><strong id="liveTitle"></strong><span id="livePosition"></span><button id="livePause">일시정지</button><button id="liveRetry" hidden>현재 장면 재시도</button><button id="liveSkip">다음 장면</button><button id="liveExit">시연 종료</button></header><div id="liveExplanation"><h1></h1><p></p></div><div id="liveStage" hidden><iframe title="ZipAI 실제 기능 자동 시연" id="liveFrame"></iframe></div><p id="liveCaption" role="status"></p>';
+  root.innerHTML='<header><strong id="liveTitle"></strong><span id="livePosition"></span><button id="livePause">일시정지</button><button id="liveRetry" hidden>현재 장면 재시도</button><button id="liveSkip">다음 장면</button><button id="liveExit">시연 종료</button><small>Voice generated with <a href="https://typecast.ai" target="_blank" rel="noopener noreferrer">Typecast</a></small></header><div id="liveExplanation"><h1></h1><p></p></div><div id="liveStage" hidden><iframe title="ZipAI 실제 기능 자동 시연" id="liveFrame"></iframe></div><p id="liveCaption" role="status"></p>';
   document.body.append(root);
   const q=s=>root.querySelector(s);const synth=window.speechSynthesis;
   let active=false,paused=false,generation=0,position=0,utterance=null,frameDoc=null,speechUnavailable=false;
@@ -39,14 +39,29 @@
   const visible=e=>!!e&&!e.hidden&&e.getClientRects().length>0;
   async function waitFor(check,t,timeout=25000){let elapsed=0;while(!stale(t)){if(paused){await new Promise(r=>setTimeout(r,150));continue;}if(check())return;await new Promise(r=>setTimeout(r,150));elapsed+=150;if(elapsed>=timeout)throw new Error('화면 또는 결과가 준비되지 않았습니다. 서버 상태·지도 키·메뉴 설정을 확인하세요.');}throw new Error('cancelled');}
   async function hold(ms,t){let n=0;await waitFor(()=>{n+=150;return n>=ms;},t,ms+1000);}
-  function say(text,t){q('#liveCaption').textContent=text;return new Promise((resolve,reject)=>{
+  const recorded=window.ZipaiAudioPlayer ? new window.ZipaiAudioPlayer() : null;
+  async function say(text,t){
+    if(recorded?.has(text)){
+      q('#liveCaption').textContent=text;
+      const result=await recorded.play(text,1);
+      if(stale(t))throw new Error('cancelled');
+      if(result==='ended')return;
+      recorded.stop();
+    }
+    return sayBrowser(text,t);
+  }
+  function sayBrowser(text,t){q('#liveCaption').textContent=text;return new Promise((resolve,reject)=>{
     const budget=Math.min(18000,Math.max(2500,text.length*65));
     const voices=synth?.getVoices().filter(v=>/^ko(?:-|_)/i.test(v.lang))||[];
+    const selected=document.getElementById('voiceSelect')?.value;
+    const voice=voices.find(v=>v.voiceURI===selected)||voices.find(v=>v.localService)||voices[0];
+    const chosenRate=Number(document.getElementById('rate')?.value);
+    const rate=Number.isFinite(chosenRate)&&chosenRate>=0.5&&chosenRate<=2?chosenRate:0.95;
     const silent=()=>{q('#liveCaption').textContent='음성 없이 자동 진행 · '+text;hold(budget,t).then(resolve,reject);};
-    if(speechUnavailable||!synth||!voices.length){silent();return;}
-    const current=new SpeechSynthesisUtterance(text);utterance=current;
-    current.lang='ko-KR';current.voice=voices[0];current.rate=1.05;
-    let finished=false,elapsed=0;
+    if(speechUnavailable||!synth||!voice){silent();return;}
+    // Match manual narration settings; read sentence chunks, not one long utterance.
+    const chunks=text.split(/(?<=[.!?。！？])\s+/).map(s=>s.trim()).filter(Boolean);
+    let finished=false,elapsed=0,chunkIndex=0,current=null,chunkLimit=0;
     const settle=(error)=>{if(finished)return;finished=true;clearInterval(watch);error?reject(error):resolve();};
     const fallback=()=>{
       if(finished)return;finished=true;clearInterval(watch);
@@ -55,12 +70,24 @@
       q('#liveCaption').textContent='음성 재생 불가 · 화면 시연은 계속 진행합니다. '+text;
       hold(Math.max(150,budget-elapsed),t).then(resolve,reject);
     };
+    const next=()=>{
+      if(finished)return;
+      if(stale(t)){settle(new Error('cancelled'));return;}
+      if(chunkIndex>=chunks.length){settle();return;}
+      const chunk=chunks[chunkIndex++];elapsed=0;
+      chunkLimit=Math.max(20000,chunk.length*200/rate);
+      current=new SpeechSynthesisUtterance(chunk);utterance=current;
+      current.lang='ko-KR';current.voice=voice;current.rate=rate;
+      const thisChunk=current;
+      current.onend=()=>{if(!finished&&current===thisChunk)next();};
+      current.onerror=()=>{if(!finished&&current===thisChunk)fallback();};
+      try{synth.resume();synth.speak(current);}catch(_){fallback();}
+    };
     const watch=setInterval(()=>{if(stale(t)){settle(new Error('cancelled'));return;}
       if(!paused)elapsed+=250;
-      if(elapsed>Math.max(12000,budget+5000))fallback();
+      if(elapsed>chunkLimit)fallback();
     },250);
-    current.onend=()=>settle();current.onerror=fallback;
-    try{synth.resume();synth.speak(current);}catch(_){fallback();}
+    next();
   });}
   function focus(selector,d){const el=d.querySelector(selector);if(!el)throw new Error('실제 화면의 요소를 찾지 못했습니다: '+selector);d.querySelectorAll('.zipai-tour-focus').forEach(e=>e.classList.remove('zipai-tour-focus'));el.classList.add('zipai-tour-focus');el.scrollIntoView({block:'center',behavior:'smooth'});}
   async function openPage(url,t){const frame=q('#liveFrame');const previous=frame.contentDocument;frameDoc=null;frame.src=url;await waitFor(()=>{try{const d=frame.contentDocument;return d&&d!==previous&&d.readyState==='complete'&&new URL(d.URL).origin===location.origin&&d.URL!=='about:blank'&&d.querySelector('body')&&(new URL(d.URL).pathname===url.split('?')[0]||url.startsWith('/demo/start')||(url==='/demo/end'&&new URL(d.URL).pathname==='/member/login'));}catch(_){return false;}},t);
@@ -68,7 +95,7 @@
     const css=frameDoc.createElement('style');css.textContent='.zipai-tour-focus{outline:4px solid #00b8ff!important;outline-offset:5px!important}html{scroll-behavior:smooth;scrollbar-width:none}::-webkit-scrollbar{display:none}';frameDoc.head.append(css);
   }
   function resize(){const stage=q('#liveStage');const scale=Math.min(stage.clientWidth/1280,stage.clientHeight/800);q('#liveFrame').style.transform='scale('+scale+')';}
-  async function runScene(t){const c=chapters[position];q('#liveRetry').hidden=true;q('#liveTitle').textContent=c.title;q('#livePosition').textContent=(position+1)+' / '+chapters.length;
+  async function runScene(t){speechUnavailable=false;const c=chapters[position];q('#liveRetry').hidden=true;q('#liveTitle').textContent=c.title;q('#livePosition').textContent=(position+1)+' / '+chapters.length;
     q('#liveStage').hidden=true;q('#liveExplanation').hidden=false;q('#liveExplanation h1').textContent=c.title;q('#liveExplanation p').textContent=c.intro;
     try{
       if(c.retryVoice)speechUnavailable=false;
@@ -96,14 +123,14 @@
       if(position+1<chapters.length){position++;runScene(t);}else{q('#liveCaption').textContent='자동 기능 시연 완료 · 종료하면 발표 장표로 돌아갑니다. SNS 로그인 화면에서 체험이 종료되었습니다.';q('#liveSkip').disabled=true;}
     }catch(error){if(stale(t))return;cancelSpeech();paused=true;q('#livePause').textContent='계속';q('#liveRetry').hidden=false;q('#liveCaption').textContent=error.message+' 성공한 결과로 표시하지 않았습니다.';}
   }
-  function cancelSpeech(){generation++;synth?.cancel();utterance=null;}
+  function cancelSpeech(){recorded?.stop();generation++;synth?.cancel();utterance=null;}
   function start(){cancelSpeech();active=true;paused=false;speechUnavailable=false;position=0;q('#liveSkip').disabled=false;q('#livePause').textContent='일시정지';root.hidden=false;runScene(generation);}
   q('#liveExit').onclick=()=>{active=false;cancelSpeech();q('#liveFrame').src='about:blank';root.hidden=true;};
-  q('#livePause').onclick=()=>{if(!q('#liveRetry').hidden){q('#liveRetry').click();return;}paused=!paused;q('#livePause').textContent=paused?'계속':'일시정지';if(paused)synth?.pause();else synth?.resume();};
+  q('#livePause').onclick=()=>{if(!q('#liveRetry').hidden){q('#liveRetry').click();return;}paused=!paused;q('#livePause').textContent=paused?'계속':'일시정지';if(paused){synth?.pause();recorded?.pause();}else{synth?.resume();recorded?.resume();}};
   q('#liveRetry').onclick=()=>{cancelSpeech();paused=false;q('#livePause').textContent='일시정지';runScene(generation);};
   q('#liveSkip').onclick=()=>{if(position+1>=chapters.length)return;cancelSpeech();paused=false;position++;q('#livePause').textContent='일시정지';runScene(generation);};
   document.addEventListener('click',e=>{if(e.target.closest('[data-tour-start]')){e.preventDefault();e.stopImmediatePropagation();document.getElementById('tourStop')?.click();synth?.cancel();start();}},true);
-  document.addEventListener('visibilitychange',()=>{if(active&&document.hidden&&!paused){paused=true;synth?.pause();q('#livePause').textContent='계속';}});
+  document.addEventListener('visibilitychange',()=>{if(active&&document.hidden&&!paused){paused=true;synth?.pause();recorded?.pause();q('#livePause').textContent='계속';}});
   window.addEventListener('resize',resize);window.addEventListener('pagehide',()=>{active=false;cancelSpeech();});
   document.querySelectorAll('[data-tour-start]').forEach(e=>e.textContent='실제 기능 자동 시연 · 약 5분');
   window.ZipaiLiveTour={chapters};

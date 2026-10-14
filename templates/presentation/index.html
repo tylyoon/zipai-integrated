@@ -5,11 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="ZipAI 프로젝트 소개, Frontend·Backend 구현과 전체 메뉴 발표">
   <title>ZipAI 프로젝트 발표</title>
-  <link rel="stylesheet" href="/static/css/presentation.css?v=20261013-1">
-  <script defer src="/static/js/presentation-data.js?v=20261013-1"></script>
-  <script defer src="/static/js/presentation-core.js?v=20261013-1"></script>
-  <script defer src="/static/js/presentation.js?v=20261013-1"></script>
-  <script defer src="/static/js/presentation-live.js?v=20261013-1"></script>
+  <link rel="stylesheet" href="/static/css/presentation.css?v=20261014-1">
+  <script defer src="/static/js/presentation-data.js?v=20261014-1"></script>
+  <script defer src="/static/js/presentation-core.js?v=20261014-1"></script>
+  <script defer src="/static/js/presentation-audio-manifest.js?v=20261014-1"></script>
+  <script defer src="/static/js/presentation-audio.js?v=20261014-1"></script>
+  <script defer src="/static/js/presentation.js?v=20261014-1"></script>
+  <script defer src="/static/js/presentation-live.js?v=20261014-1"></script>
 </head>
 <body>
   <header class="presentation-header">
@@ -37,11 +39,12 @@
       <button type="button" id="tourStop">자동 시연 종료</button>
     </div>
     <div class="progress" aria-hidden="true"><span id="progressFill"></span></div>
+    <small style="grid-column:1/-1;text-align:right;font-size:11px">Voice generated with <a href="https://typecast.ai" target="_blank" rel="noopener noreferrer">Typecast</a></small>
   </footer>
   <p id="voiceStatus" role="status" class="voice-status">음성 설명은 버튼을 누르면 시작됩니다.</p>
   <aside id="settings" class="settings" hidden aria-label="음성 설정과 설명 대본">
     <div class="panel-heading"><h2>음성 설정·대본</h2><button type="button" id="settingsClose">닫기</button></div>
-    <p class="settings-note">브라우저의 한국어 음성 읽기를 사용합니다. 녹음 파일이 아니며 PC마다 목소리와 지원 여부가 다를 수 있습니다.</p>
+    <p class="settings-note">사만다 공통 음성 파일을 우선 재생합니다. 파일이 없거나 실패하면 기기의 한국어 음성을 사용합니다. 목소리 선택은 기기 음성에 적용됩니다.</p>
     <label>한국어 목소리<select id="voiceSelect" aria-label="한국어 목소리 선택"></select></label>
     <label>읽기 속도<select id="rate"><option value="0.85">천천히</option><option value="0.95" selected>보통</option><option value="1.1">빠르게</option></select></label>
     <label class="check"><input type="checkbox" id="follow" checked> 장표를 넘기면 새 설명 재생</label>

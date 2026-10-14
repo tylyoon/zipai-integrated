@@ -150,7 +150,7 @@
     clearAdvance();
     if (muted) { status.textContent = '음소거를 해제한 뒤 재생해 주세요.'; return; }
     const voice = voices.find(v=>v.voiceURI === selectedVoice) || voices[0];
-    if (!voice && synth) {
+    if (!voice && synth && !window.ZIPAI_AUDIO_MANIFEST?.[currentSlide().script]) {
       enabled = false; narrator.stop();
       if (tour.active) { pendingVoice = false; audioNotice = '한국어 음성이 없어 화면만 자동 진행합니다. 음성 설정에서 한국어 목소리를 확인해 주세요.'; status.textContent = audioNotice; }
       else { pendingVoice = true; status.textContent = '한국어 목소리를 확인 중입니다. 목록이 없으면 Windows 한국어 음성 설정을 확인해 주세요.'; }
